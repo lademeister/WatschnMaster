@@ -17,6 +17,8 @@
 #include <time.h>
 #include <Timezone.h>    // https://github.com/JChristensen/Timezone
 
+//comment from Moikus
+
 //comment Vince for github-auto-update:
 //you need to do some prerequisites on the ESP (setting up spiffs filesystem on ESP8266) and setting up arduino ide to be able to upload files to ESP8266 spiffs filesystem,
 //and you need to create a certificate that you will upload to ESP8266.
