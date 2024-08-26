@@ -2530,15 +2530,19 @@ void i2cscan(){
      else if (error==4)
      {
       Serial.print(F("Unknown error at address 0x"));
-      if (address<16)
+      if (address<16){
          Serial.print(F("0"));
+      }
       Serial.println(address,HEX);
-     }    
+     }
     }
-    if (nDevices == 0)
+    if (nDevices == 0){
        Serial.println(F("No I2C devices found\n"));
+    }
     else
+    {
        Serial.println(F("done\n"));
+    }
 }
 
 void sweepup_leds(){
