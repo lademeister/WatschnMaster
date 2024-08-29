@@ -47,9 +47,12 @@
 
 long lastReconnectAttempt = 0;
 
-//WiFiClientSecure wifiClient; //does not work with pubsubclient and unauthorized hive.mq
-WiFiClient wifiClient;
-PubSubClient mqttClient(wifiClient);
+
+//WiFiClient wifiClient;
+//PubSubClient mqttClient(wifiClient);
+WiFiClientSecure secureClient;  // Create a secure WiFi client
+PubSubClient mqttClient(secureClient);  // Initialize the PubSubClient with the secure client
+
 WiFiManager wifiManager;
 
 ////variables to read a wifi SSID and wifi password from a text file (named known_wifis.txt) which is stored locally on your ESP8266, so that the publicly visible code on the GitHub repository doesn't contain your wifi credentials
@@ -182,6 +185,8 @@ char* mqttonlineTopic = "MyDevice/status/";
 char* mqttfirmwareTopic = "MyDevice/firmwareversion/";
 char* mqttWillTopic = "MyDevice/online/";
 char *mqttServer = "broker.hivemq.com";
+char *mqttUser = "MyUserName";
+char *mqttPass = "MyPassword";
 char *mqttPort_txt = "1883"; //char variable to read from configuration text file mqtt_config.txt
 
 int mqttPort = 1883;//integer variable that will be overwritten with the content of *mqttPort_txt, if it can be read from mqtt config file.
@@ -206,11 +211,15 @@ const char* validVarNames[] = { //attention: adding something (or changing arran
   "mqttWillTopic",
   "mqttServer",
   "mqttPort_txt",
+  "mqttUser",
+  "mqttPass",
   "mqttBockfotznTopic",
   "mqttGetAggressiveTopic",
   "mqttMoveStepperTopic", 
   "mqttMultiwatschnTopic"
 };
+
+
 
 
 
@@ -225,6 +234,8 @@ char** mqttVars[numValidVarNames] = { //reihenfolge (und kommas nach jedem Eleme
   &mqttWillTopic,
   &mqttServer,
   &mqttPort_txt,
+  &mqttUser,
+  &mqttPass,
   &mqttBockfotznTopic,
   &mqttGetAggressiveTopic,
   &mqttMoveStepperTopic,
@@ -445,14 +456,14 @@ unsigned long checkpointTime = 0;  // Store the time of the last checkpoint
 
 
 
-/*The function read_mqtt_topics_from_configfile() reads MQTT topics from a file named "mqtt_config.txt" stored in the SPIFFS memory of a device.
+/*The function read_mqtt_config_from_configfile() reads MQTT topics from a file named "mqtt_config.txt" stored in the SPIFFS memory of a device.
    The function opens the file and reads each line of the file, skipping comments and empty lines. The function then splits each line into a variable name and a topic using the equal sign (=)
    as a delimiter. The function searches for a matching variable name in an array of valid variable names and sets the corresponding MQTT variable to the topic. If the variable name is invalid,
    an error message is printed. After all topics are read and set, the function prints the set MQTT topics and information about the MQTT broker to which the device will connect.
    If the file cannot be opened, an error message is printed, instructing the user to create the file with the correct format.
 
 */
-void read_mqtt_topics_from_configfile() {
+void read_mqtt_config_from_configfile() {
   // Open mqtt_config.txt file for reading
   File MQTTconfigFile = SPIFFS.open("/mqtt_config.txt", "r");
 
@@ -522,6 +533,10 @@ void read_mqtt_topics_from_configfile() {
     Serial.print(F("', at port "));
     Serial.print(mqttPort);
     Serial.println(F("."));
+    Serial.print(F("MQTT Username: "));
+    Serial.println(mqttUser);
+    Serial.print(F("MQTT Password: "));
+    Serial.println(mqttPass);
     Serial.print(F("mqttBockfotznTopic: "));
     Serial.println(mqttBockfotznTopic);
     Serial.print(F("mqttGetAggressiveTopic: "));
@@ -799,7 +814,8 @@ void setup_GitHUB_OTA_upgrade() {
   Serial.println();
   Serial.println(F("================================================================================"));
   Serial.println(F("|                                                                              |"));
-  Serial.println(F("|                  Welcome to the ESP GitHub OTA Update TEST                   |"));
+  Serial.println(F("|                   WatschnMaster ist Teil der globalen                        |"));
+  Serial.println(F("|                   Watschn-Allianz im Bockfotzn-Netzwerk.                     |"));
   Serial.println(F("|                =============================================                 |"));
   Serial.print(F("|    Version:    "));
   Serial.print(GHOTA_CURRENT_TAG);
@@ -844,7 +860,7 @@ void setup_GitHUB_OTA_upgrade() {
     // Perform setup for first-time use
     read_known_wifi_credentials_from_configfile();
     MultiWiFiCheck();
-    // read_mqtt_topics_from_configfile();
+    // read_mqtt_config_from_configfile();
 
 
 
@@ -996,16 +1012,20 @@ void setup_GitHUB_OTA_upgrade() {
     //  mqttClient.setCallback(mqttCallback);
 
     int mqtt_connection_tries = 0;
-    while (!mqttClient.connect(mqttClientId) && mqtt_connection_tries < maximum_mqtt_connection_tries) {
+    while (!(mqttClient.connect(mqttClientId, mqttUser, mqttPass)) && mqtt_connection_tries < maximum_mqtt_connection_tries) {
 
-      //while (!mqttClient.connect(mqttClientId, mqttUsername, mqttPassword)) {
-      //while (!mqttClient.connect(mqttClientId, mqttUsername, mqttPassword, mqttWillTopic, mqttwillQoS, mqttwillRetain, mqttWillMessage, mqttcleanSession)) {
+      //while (!mqttClient.connect(mqttClientId, mqttUser, mqttPass)) {
+      //while (!mqttClient.connect(mqttClientId, mqttUser, mqttPass, mqttWillTopic, mqttwillQoS, mqttwillRetain, mqttWillMessage, mqttcleanSession)) {
 
 
 
-      Serial.print(F("MQTT: trying to connect as "));
+      Serial.print(F("MQTT: "));
       Serial.print(mqttClientId);
-      Serial.print(F(" to "));
+      Serial.print(F(" trying to connect as User '"));
+      Serial.print(mqttUser);
+      Serial.print(F("' with password '"));
+      Serial.print(mqttPass);
+      Serial.print(F("' to "));
 
       Serial.print(mqttServer);
       Serial.print(F(" at Port "));
@@ -1115,13 +1135,72 @@ void setup_GitHUB_OTA_upgrade() {
   Serial.println(F("Setup finished. going to loop() now"));
   }
 }
+/****** root certificate *********/
 
+static const char *root_ca PROGMEM = R"EOF(
+-----BEGIN CERTIFICATE-----
+MIIFazCCA1OgAwIBAgIRAIIQz7DSQONZRGPgu2OCiwAwDQYJKoZIhvcNAQELBQAw
+TzELMAkGA1UEBhMCVVMxKTAnBgNVBAoTIEludGVybmV0IFNlY3VyaXR5IFJlc2Vh
+cmNoIEdyb3VwMRUwEwYDVQQDEwxJU1JHIFJvb3QgWDEwHhcNMTUwNjA0MTEwNDM4
+WhcNMzUwNjA0MTEwNDM4WjBPMQswCQYDVQQGEwJVUzEpMCcGA1UEChMgSW50ZXJu
+ZXQgU2VjdXJpdHkgUmVzZWFyY2ggR3JvdXAxFTATBgNVBAMTDElTUkcgUm9vdCBY
+MTCCAiIwDQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIBAK3oJHP0FDfzm54rVygc
+h77ct984kIxuPOZXoHj3dcKi/vVqbvYATyjb3miGbESTtrFj/RQSa78f0uoxmyF+
+0TM8ukj13Xnfs7j/EvEhmkvBioZxaUpmZmyPfjxwv60pIgbz5MDmgK7iS4+3mX6U
+A5/TR5d8mUgjU+g4rk8Kb4Mu0UlXjIB0ttov0DiNewNwIRt18jA8+o+u3dpjq+sW
+T8KOEUt+zwvo/7V3LvSye0rgTBIlDHCNAymg4VMk7BPZ7hm/ELNKjD+Jo2FR3qyH
+B5T0Y3HsLuJvW5iB4YlcNHlsdu87kGJ55tukmi8mxdAQ4Q7e2RCOFvu396j3x+UC
+B5iPNgiV5+I3lg02dZ77DnKxHZu8A/lJBdiB3QW0KtZB6awBdpUKD9jf1b0SHzUv
+KBds0pjBqAlkd25HN7rOrFleaJ1/ctaJxQZBKT5ZPt0m9STJEadao0xAH0ahmbWn
+OlFuhjuefXKnEgV4We0+UXgVCwOPjdAvBbI+e0ocS3MFEvzG6uBQE3xDk3SzynTn
+jh8BCNAw1FtxNrQHusEwMFxIt4I7mKZ9YIqioymCzLq9gwQbooMDQaHWBfEbwrbw
+qHyGO0aoSCqI3Haadr8faqU9GY/rOPNk3sgrDQoo//fb4hVC1CLQJ13hef4Y53CI
+rU7m2Ys6xt0nUW7/vGT1M0NPAgMBAAGjQjBAMA4GA1UdDwEB/wQEAwIBBjAPBgNV
+HRMBAf8EBTADAQH/MB0GA1UdDgQWBBR5tFnme7bl5AFzgAiIyBpY9umbbjANBgkq
+hkiG9w0BAQsFAAOCAgEAVR9YqbyyqFDQDLHYGmkgJykIrGF1XIpu+ILlaS/V9lZL
+ubhzEFnTIZd+50xx+7LSYK05qAvqFyFWhfFQDlnrzuBZ6brJFe+GnY+EgPbk6ZGQ
+3BebYhtF8GaV0nxvwuo77x/Py9auJ/GpsMiu/X1+mvoiBOv/2X/qkSsisRcOj/KK
+NFtY2PwByVS5uCbMiogziUwthDyC3+6WVwW6LLv3xLfHTjuCvjHIInNzktHCgKQ5
+ORAzI4JMPJ+GslWYHb4phowim57iaztXOoJwTdwJx4nLCgdNbOhdjsnvzqvHu7Ur
+TkXWStAmzOVyyghqpZXjFaH3pO3JLF+l+/+sKAIuvtd7u+Nxe5AW0wdeRlN8NwdC
+jNPElpzVmbUq4JUagEiuTDkHzsxHpFKVK7q4+63SM1N95R1NbdWhscdCb+ZAJzVc
+oyi3B43njTOQ5yOf+1CceWxG1bQVs5ZufpsMljq4Ui0/1lvh+wjChP4kqKOJ2qxq
+4RgqsahDYVvTH9w7jXbyLeiNdd8XM2w9U/t7y0Ff/9yi0GE44Za4rF2LN9d11TPA
+mRGunUHBcnWEvgJBQl9nJEiU0Zsnvgc/ubhPgXRR4Xq37Z0j4r7g1SgEEzwxA57d
+emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
+-----END CERTIFICATE-----
+)EOF";
+
+//old 
+//void setup_mqtt_config() {
+//  read_mqtt_config_from_configfile();
+//  mqttClient.setServer(mqttServer, mqttPort);
+//  mqttClient.setCallback(mqttCallback);
+//  Serial.println(F("MQTT broker settings and MQTT callback setting: done."));
+//}
+
+//new:
+#ifdef ESP8266
+// ESP8266-specific SSL/TLS configuration
 void setup_mqtt_config() {
-  read_mqtt_topics_from_configfile();
+  read_mqtt_config_from_configfile();
+  secureClient.setInsecure();  // Disable certificate verification for ESP8266
   mqttClient.setServer(mqttServer, mqttPort);
   mqttClient.setCallback(mqttCallback);
   Serial.println(F("MQTT broker settings and MQTT callback setting: done."));
 }
+#else
+// For ESP32 or other platforms where certificate is used
+void setup_mqtt_config() {
+  read_mqtt_config_from_configfile();
+  secureClient.setCACert(root_ca);  // Provide the CA certificate for verification
+  mqttClient.setServer(mqttServer, mqttPort);
+  mqttClient.setCallback(mqttCallback);
+  Serial.println(F("MQTT broker settings and MQTT callback setting: done."));
+}
+#endif
+
+
 
 void setup_local_OTA(){
      //ArduinoOTA.setHostname("MyDevice");
@@ -1336,7 +1415,7 @@ boolean reconnect() {
     Serial.print(F(" at Port "));
     Serial.println(mqttPort);
 
-    if (mqttClient.connect(mqttClientId)) {
+    if (mqttClient.connect(mqttClientId, mqttUser, mqttPass)) {
       Serial.println(F("Connected."));
       mqttClient.publish(mqttDevicenameTopic, mqttClientId);
       mqttClient.publish(mqttonlineTopic, " online"); //should be set up with will message so that "offline" appears automatically set by the MQTT broker when the device is offline
@@ -1356,8 +1435,8 @@ boolean reconnect() {
   //++++++++++++++++++++++
 
 
-  // // if (mqttClient.connect(mqttClientId, mqttUsername, mqttPassword)) {
-  // //if (mqttClient.connect(mqttClientId, mqttUsername, mqttPassword, mqttWillTopic, mqttwillQoS, mqttwillRetain, mqttWillMessage)) {
+  // // if (mqttClient.connect(mqttClientId, mqttUser, mqttPass)) {
+  // //if (mqttClient.connect(mqttClientId, mqttUser, mqttPass, mqttWillTopic, mqttwillQoS, mqttwillRetain, mqttWillMessage)) {
   // if (mqttClient.connect(mqttClientId)) {
   //
   //
