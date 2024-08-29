@@ -1,0 +1,4 @@
+FRITZ!Box 7312:123454
+Pretty wifi:password
+Iot:sdgfsdfgdfg
+

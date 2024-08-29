@@ -1,0 +1,14 @@
+mqttClientId=watschnGuenter2
+mqttDevicenameTopic=WatschnMaster/devicename/
+mqttupdateTopic=WatschnMaster/update/
+mqttonlineTopic=WatschnMaster/status/
+mqttfirmwareTopic=WatschnMaster/firmwareversion/
+mqttWillTopic=WatschnMaster/online/
+mqttServer=212345-correctme-67890.s1.eu.hivemq.cloud
+mqttPort_txt=8883
+mqttUser=falschername
+mqttPass=Falschespasswort1
+mqttBockfotznTopic=WatschnMaster/bockfotzn/
+mqttGetAggressiveTopic=WatschnMaster/getAggressive/
+mqttMoveStepperTopic=WatschnMaster/moveStepper/
+mqttMultiwatschnTopic=WatschnMaster/multiwatschn/
