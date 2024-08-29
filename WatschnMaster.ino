@@ -1230,20 +1230,25 @@ void check_ota_github() {
 //}
 
 
-//function prototype to let the compiler know that functions exists later in code (Arduino IDE *should* solve that on its own but doesn't):
-void massier_den_kürbis_bis_er_mürb_is(); 
-void massier_den_kürbis_soft();
-void massier_den_kürbis_hard();
-void schwungholen_und_watschen();
-void ausfallschritt_und_schelln(); 
+//function prototype to let the compiler know that functions exists later in code, including default parameter values:
+void massier_den_kürbis_bis_er_mürb_is(bool retransmit_message = true); 
+void massier_den_kürbis_soft(bool retransmit_message = true);
+void schwungholen_und_watschen(bool retransmit_message = true);
+void ausfallschritt_und_schelln(bool retransmit_message = true); 
+void multiwatschn(int haudrauf,bool retransmit_message = true); 
+void ausfallschritt_und_schelln_andeuten(bool retransmit_message = true);
 
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
   String message = "";
   for (int i = 0; i < length; i++) {
     message += (char)payload[i];
   }
-  Serial.print(F("MQTT Message received: "));
-  Serial.println(message);
+  Serial.print(F("MQTT Message received in topic '"));
+  Serial.print(topic);
+  Serial.print(F("'. Message: '"));
+  Serial.print(message);
+  Serial.println(F("'"));
+  Serial.println();
 
   if (strcmp(topic, mqttupdateTopic) == 0) {
     if (message == "update") {
@@ -1252,33 +1257,37 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
   }
   else if (strcmp(topic, mqttBockfotznTopic) == 0) {
     if (message == "watschn") {
-      Serial.print(F("Aufruf 'schwungholen_und_watschen()' aus der globalen Watsch-Allianz über das Bockfotzn-Netzwerk."));
-      schwungholen_und_watschen();
+      Serial.println(F("Aufruf 'schwungholen_und_watschen(bool retransmit_message)' aus der globalen Watsch-Allianz über das Bockfotzn-Netzwerk."));
+      schwungholen_und_watschen(0);
     }
     else if (message == "schelln") {
-      Serial.print(F("Aufruf 'ausfallschritt_und_schelln()' aus der globalen Watsch-Allianz über das Bockfotzn-Netzwerk."));
-      ausfallschritt_und_schelln(); 
+      Serial.println(F("Aufruf 'ausfallschritt_und_schelln(bool retransmit_message)' aus der globalen Watsch-Allianz über das Bockfotzn-Netzwerk."));
+      ausfallschritt_und_schelln(0); 
+    }
+    else if (message == "schelln andeuten") {
+      Serial.println(F("Aufruf 'ausfallschritt_und_schelln_andeuten(bool retransmit_message)' aus der globalen Watsch-Allianz über das Bockfotzn-Netzwerk."));
+      ausfallschritt_und_schelln_andeuten(0); 
     }
     else if (message == "kuerbis_hard"){
-        Serial.print(F("Aufruf 'massier_den_kürbis_bis_er_mürb_is()' aus der globalen Watsch-Allianz über das Bockfotzn-Netzwerk."));
-        massier_den_kürbis_bis_er_mürb_is(); //multiwatschn(int haudrauf);
+        Serial.println(F("Aufruf 'massier_den_kürbis_bis_er_mürb_is(bool retransmit_message)' aus der globalen Watsch-Allianz über das Bockfotzn-Netzwerk."));
+        massier_den_kürbis_bis_er_mürb_is(0); 
     } else if (message == "kuerbis_soft"){
-        Serial.print(F("Aufruf 'massier_den_kürbis_soft()' aus der globalen Watsch-Allianz über das Bockfotzn-Netzwerk."));
-        massier_den_kürbis_soft(); //multiwatschn(int haudrauf);
+        Serial.println(F("Aufruf 'massier_den_kürbis_soft(bool retransmit_message)' aus der globalen Watsch-Allianz über das Bockfotzn-Netzwerk."));
+        massier_den_kürbis_soft(0); 
     }
   }
   else if (strcmp(topic, mqttMultiwatschnTopic) == 0) {
     if (isNumber(message)) {
-        Serial.print(F("Aufruf 'multiwatschn(int haudrauf)' aus der globalen Watsch-Allianz über das Bockfotzn-Netzwerk."));
+        Serial.println(F("Aufruf 'multiwatschn(int haudrauf, bool retransmit)' aus der globalen Watsch-Allianz über das Bockfotzn-Netzwerk."));
         int number = message.toInt(); // Convert the String to an integer
-        multiwatschn(number); //multiwatschn(int haudrauf);
+        multiwatschn(number, 0); //multiwatschn(int haudrauf);
     } else {
         Serial.println(F("The message received in mqttMultiwatschnTopic is not a valid number."));
     }
   }
   else if (strcmp(topic, mqttMoveStepperTopic) == 0) {
     if (isNumber(message)) {
-        Serial.print(F("Aufruf 'move_stepper(steps)' aus der globalen Watsch-Allianz über das Bockfotzn-Netzwerk."));
+        Serial.println(F("Aufruf 'move_stepper(steps)' aus der globalen Watsch-Allianz über das Bockfotzn-Netzwerk."));
         int number = message.toInt(); // Convert the String to an integer
         move_stepper(number); //move_stepper(steps)
     } else {
@@ -1287,7 +1296,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
   }
   else if (strcmp(topic, mqttGetAggressiveTopic) == 0) {
     if (isNumber(message)) {
-        Serial.print(F("Aufruf 'get_aggressive(int how_agressive)' aus der globalen Watsch-Allianz über das Bockfotzn-Netzwerk."));
+        Serial.println(F("Aufruf 'get_aggressive(int how_agressive)' aus der globalen Watsch-Allianz über das Bockfotzn-Netzwerk."));
         int number = message.toInt(); // Convert the String to an integer
         get_aggressive(number); //get_aggressive(int how_agressive)
     } else {
@@ -1363,6 +1372,15 @@ boolean reconnect() {
   return mqttClient.connected();
 
 }
+
+void publishToMQTT(String message, char* topic) {
+  // Publish the user-defined message to the specified topic
+  mqttClient.publish(topic, message.c_str());
+}
+/*examples:
+ * publishToMQTT("watschn", mqttBockfotznTopic);
+ * publishToMQTT("68", mqttMoveStepperTopic);
+ */
 
 void publish_device_info() {
   String message = "DeviceID ";
@@ -2001,7 +2019,12 @@ void goto_init_position(int direction){
    
 }
 
-void schwungholen_und_watschen(){
+
+
+void schwungholen_und_watschen(bool retransmit_message){ //default value of bool is true, given by separate function declaration , means calling without parameter schwungholen_und_watschen(); will retransmit the message to the Bockfotzn-Network
+  if(retransmit_message){
+  publishToMQTT("watschn", mqttBockfotznTopic);
+  }
   ausfallschritt_servo.attach(SERVO_PIN);  // attaches the servo on GIO2 to the servo object
   ausfallschritt_servo.write(zurück);
   delay(500);
@@ -2212,7 +2235,12 @@ void goto_init_position_idle2(){
   }
 }
 
-void multiwatschn(int haudrauf){
+void multiwatschn(int haudrauf, bool retransmit_message){ //default value bool retransmit_message = true is given in separate function definition
+  if(retransmit_message){
+    String message = String(haudrauf); // Convert the int to a String
+    //Serial.println(F("DBG:  post amount of multiwatschn to mqttMultiwatschnTopic if the message did not come in through MQTT already"));
+    publishToMQTT(message, mqttMultiwatschnTopic);
+  }
   ausfallschritt_servo.attach(SERVO_PIN);  // attaches the servo on GIO2 to the servo object
   //stepper.setSpeed(40); //debug: go slow
   delay(300); //DEBUG: nötig? reduzieren?
@@ -2342,8 +2370,11 @@ void multiwatschn3(int haudrauf){
   provocation_counter=0;
 }
 
-void ausfallschritt_und_watschn_andeuten(){ //ready: Günter macht einen schritt vorwärts und haut gerade noch nicht zu
-  Serial.println(F("DBG: Anfang funktion ausfallschritt_und_watschn_andeuten()"));
+void ausfallschritt_und_schelln_andeuten(bool retransmit_message){ //ready: Günter macht einen schritt vorwärts und haut gerade noch nicht zu . //default value bool retransmit_message = true is defined in separate function definition
+  if(retransmit_message){
+    publishToMQTT("schelln andeuten", mqttBockfotznTopic);
+  }
+  Serial.println(F("DBG: Anfang funktion ausfallschritt_und_schelln_andeuten()"));
   ausfallschritt_servo.attach(SERVO_PIN);  // attaches the servo on GIO2 to the servo object
  // delay(300); //DEBUG: nötig? reduzieren?
   init_stepper();
@@ -2356,11 +2387,14 @@ void ausfallschritt_und_watschn_andeuten(){ //ready: Günter macht einen schritt
   delay(200);
   ausfallschritt_servo.detach();
   free_stepper();
-  Serial.println(F("DBG: Ende funktion ausfallschritt_und_watschn_andeuten()"));
+  Serial.println(F("DBG: Ende funktion ausfallschritt_und_schelln_andeuten()"));
   provocation_counter=0;
 }
 
-void ausfallschritt_und_schelln(){ //ready: Günter macht einen schritt vorwärts und haut zu
+void ausfallschritt_und_schelln(bool retransmit_message){ //ready: Günter macht einen schritt vorwärts und haut zu  //default value bool retransmit_message = true given in separate function definition
+  if(retransmit_message){
+    publishToMQTT("schelln", mqttBockfotznTopic);
+  }
   Serial.println(F("DBG: Anfang funktion ausfallschritt_und_schelln()"));
   ausfallschritt_servo.attach(SERVO_PIN);  // attaches the servo on GIO2 to the servo object
  // delay(300); //DEBUG: nötig? reduzieren?
@@ -2378,7 +2412,10 @@ void ausfallschritt_und_schelln(){ //ready: Günter macht einen schritt vorwärt
   provocation_counter=0;
 }
 
-void massier_den_kürbis_soft(){ //ready: Günter macht einen schritt vorwärts und Rüttelwatscht sanft die Rübe
+void massier_den_kürbis_soft(bool retransmit_message){ //ready: Günter macht einen schritt vorwärts und Rüttelwatscht sanft die Rübe . //default value bool retransmit_message = true given in separate function definition
+  if(retransmit_message){
+    publishToMQTT("kuerbis_soft", mqttBockfotznTopic);
+  }
   Serial.println(F("DBG: Anfang funktion massier_den_kürbis_soft()"));
   ausfallschritt_servo.attach(SERVO_PIN);  // attaches the servo on GIO2 to the servo object
  // delay(300); //DEBUG: nötig? reduzieren?
@@ -2409,7 +2446,10 @@ void massier_den_kürbis_soft(){ //ready: Günter macht einen schritt vorwärts 
   provocation_counter=0;
 }
 
-void massier_den_kürbis_bis_er_mürb_is(){ //ready: Günter macht einen schritt vorwärts und Rüttelwatscht intensiv die Rübe
+void massier_den_kürbis_bis_er_mürb_is(bool retransmit_message){ //ready: Günter macht einen schritt vorwärts und Rüttelwatscht intensiv die Rübe . //default value bool retransmit_message = true given in separate function definition
+  if(retransmit_message){
+    publishToMQTT("kuerbis_hard", mqttBockfotznTopic);
+  }
   Serial.println(F("DBG: Anfang funktion massier_den_kürbis_bis_er_mürb_is()"));
   ausfallschritt_servo.attach(SERVO_PIN);  // attaches the servo on GIO2 to the servo object
  // delay(300); //DEBUG: nötig? reduzieren?
@@ -2466,7 +2506,7 @@ void get_aggressive(int agression_level){
     wutlevel=mindestwut;
 
     init_stepper();
-    
+  Serial.println(F("starte Wutaufbau..."));
   // fade Günters face from min to max_aggression_led in increments of n points:
   for (int fadeValue = 0 ; fadeValue <= max_aggression_led; fadeValue += led_agression_increase_coefficient) {
     // sets the value (range from 0 to 255):
@@ -2486,7 +2526,7 @@ void get_aggressive(int agression_level){
     }
   wutlevel=0;
   //delay(500);
-  Serial.println(F("Debug: Wutaufbau beendet, starte jetzt dreifachen Watschberger mittels multiwatschn()"));
+  Serial.println(F("Wutaufbau beendet, starte jetzt dreifachen Watschberger mittels multiwatschn()"));
   multiwatschn(3);
   delay(100);
   ausfallschritt_servo.write(zurück);
@@ -2721,7 +2761,7 @@ void listen_to_serial(){
     }
     else if(target_steps==3){
       Serial.println(F("massier_den_kürbis_bis_er_mürb_is() requested via serial"));
-      //ausfallschritt_und_watschn_andeuten();
+      //ausfallschritt_und_schelln_andeuten();
       //delay(200);
       massier_den_kürbis_bis_er_mürb_is();
       
@@ -2848,19 +2888,19 @@ void loop() {
     
 
 //ACHTUNG: das ist ohne Zeitoffset!! passt also noch nicht:
-    if (timeClient.getHours() == 00 && timeClient.getMinutes() == 19 && timeClient.getSeconds() == 0) {
+    if (timeClient.getHours() == 12 && timeClient.getMinutes() == 0 && timeClient.getSeconds() == 0) {
       auf_die_12();
     }
 
-//    if (timeClient.getHours() == 13 && timeClient.getMinutes() == 0 && timeClient.getSeconds() == 0) {
-//      jetzt_schlägts_13();
-//    }
-//    if (timeClient.getHours() == 00 && timeClient.getMinutes() == 43 && timeClient.getSeconds() == 0) {
-//      Serial.println("################ test 00:43h . #####################");
-//      Serial.println("################ test 00:43h . #####################");
-//      Serial.println("################ test 00:43h . #####################");
-//      Serial.println("################ test 00:43h . #####################");
-//    }
+    if (timeClient.getHours() == 13 && timeClient.getMinutes() == 0 && timeClient.getSeconds() == 0) {
+      jetzt_schlägts_13();
+    }
+    if (timeClient.getHours() == 00 && timeClient.getMinutes() == 55 && timeClient.getSeconds() == 0) {
+      Serial.println("################ test 00:43h . #####################");
+      Serial.println("################ test 00:43h . #####################");
+      Serial.println("################ test 00:43h . #####################");
+      Serial.println("################ test 00:43h . #####################");
+    }
 
 //checkpointTime = micros();
 //    looptime_calculation(); //for debugging if loop takes too long
