@@ -1,4 +1,9 @@
-FRITZ!Box 7312:123454
-Pretty wifi:password
-Iot:sdgfsdfgdfg
-
+FRITZ!Box 7312:12345678900987654321
+Pretty random:nahornoUUmb2
+iot:8o4576HbdfsfkK&34
+ScottysKitchen:kalasch332
+CasaDelOlmenhaus:345GGDd
+FRITZ!Box 7560 TL:4274337965767ll0808178
+FRITZ!Box 7560 NT:574454536778299454
+#Moaniu HTC:aaabbbCCCDDD
+# commenting works with '#' 
