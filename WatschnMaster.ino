@@ -1,8 +1,20 @@
+//to do:
+////local MQTT:
+//char* mqttBockfotznTopicLocal = "MyDevice/bo123/"; //MQTT Message received in topic 'MyDevice/bo123/'. Message: 'watschn' --> does not trigger from local
+
+//WATSCHNMASTER  GLOBALE WATSCHN-ALLIANZ im Bockfotzn-Netzwerk
 
 
-//WATSCHNMASTER+OTA-GitHUb update - try to combine
 
-
+/* This code is intended to drive Günter Watschn Master Hardware.
+ * This code will try to get a password protected MQTT connection to a MQTT broker.
+ * ESP8266 does not support Certificates, but the code also can be used for ESP32 only pin assignments need to be adapted)
+ * Example MacOS compatible shell commands to connect to a MQTT broker and subscribe/publish:
+ * mosquitto_sub -h 123456789999999999987654321a1.s1.eu.hivemq.cloud -p 8883 -t "WatschnMaster/bockfotzn/" -u MyUserNameIswatschnmaster -P MyPassword1 --insecure
+ * mosquitto_pub -h 123456789999999999987654321a1.s1.eu.hivemq.cloud -p 8883 -t WatschnMaster/bockfotzn/ -m "watschn" -u MyUserNameIswatschnmaster -P MyPassword1 --insecure
+ */
+#define USE_LOCAL_MQTT
+#define USE_GLOBAL_MQTT
 
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
@@ -22,9 +34,9 @@
 #include <TimeLib.h>
 #include <time.h>
 #include <Timezone.h>    // https://github.com/JChristensen/Timezone
-#include "MeshManager.h"
+//#include "MeshManager.h"
 
-#include <ESP8266WiFi.h>
+//#include <ESP8266WiFi.h>
 #include <FS.h>
 //#include <ESP8266WebServer.h>
 #include <WiFiManager.h>
@@ -50,10 +62,34 @@ long lastReconnectAttempt = 0;
 
 //WiFiClient wifiClient;
 //PubSubClient mqttClient(wifiClient);
-WiFiClientSecure secureClient;  // Create a secure WiFi client
-PubSubClient mqttClient(secureClient);  // Initialize the PubSubClient with the secure client
+//WiFiClientSecure secureClient;  // Create a secure WiFi client
+//PubSubClient mqttClient(secureClient);  // Initialize the PubSubClient with the secure client
+//PubSubClient mqttClientLocal(secureClient);  // Initialize the PubSubClient with the secure client
 
-WiFiManager wifiManager;
+////old:
+//WiFiClientSecure secureClientGlobal;  // Secure WiFi client for global MQTT
+//WiFiClientSecure secureClientLocal;   // Secure WiFi client for local MQTT
+//
+//PubSubClient mqttClient(secureClientGlobal);    // Global MQTT client
+//PubSubClient mqttClientLocal(secureClientLocal); // Local MQTT client
+
+//NEW:
+WiFiClientSecure secureClientGlobal;  // Secure WiFi client for global MQTT
+PubSubClient mqttClient(secureClientGlobal);    // Global MQTT client
+
+//secure local client:
+//WiFiClientSecure secureClientLocal;   // Secure WiFi client for local MQTT
+//PubSubClient mqttClientLocal(secureClientLocal); // Local MQTT client
+
+//normal local client:
+WiFiClient ClientLocal;
+PubSubClient mqttClientLocal(ClientLocal);
+
+
+
+
+
+//WiFiManager wifiManager;
 
 ////variables to read a wifi SSID and wifi password from a text file (named known_wifis.txt) which is stored locally on your ESP8266, so that the publicly visible code on the GitHub repository doesn't contain your wifi credentials
 //String SSID_txt = "";
@@ -131,29 +167,24 @@ bool check_OTA_on_boot = false; // may be changed by user before compiling. if s
 #define GHOTA_ACCEPT_PRERELEASE 0 //if set to 1 we will also update if a release of the github repository is set as 'prereelease'. Ignore prereleases if set to 0.
 
 
-#define DRD_TIMEOUT 3 // Number of seconds after reset during which a subseqent reset will be considered a double reset.
+#define DRD_TIMEOUT 10 // Number of seconds after reset during which a subseqent reset will be considered a double reset.
 
 // RTC Memory Address for the DoubleResetDetector to use
 #define DRD_ADDRESS 0
 
 DoubleResetDetector drd(DRD_TIMEOUT, DRD_ADDRESS);
 
-
-
-
 bool mqtt_config_hasbeenread = false; //do not change. used to know if we need to read the config data
 // Publish device ID and firmware version to MQTT topic
 char device_id[9]; // 8 character hex device ID + null terminator
-
-
 
 //Static WiFi SSID and password definitions
 #ifndef STASSID
 #define STASSID "dont_place_it_here"
 #define STAPSK  "put_it_in_textfile_on_SPIFFS_instead"
 #endif
-#define wm_accesspointname "ESP8266 OTA-GitHub-Upgrade" //SSID when device opens up an access point for configuration
-const int wm_accesspointtimeout = 30;
+#define wm_accesspointname "WatschnFM" //SSID when device opens up an access point for configuration
+const int wm_accesspointtimeout = 60;
 const int wifitimeout = 6; //in SECONDS.
 
 //initial MQTT setup: if a file named mqtt_config.txt is uploaded to spiffs that contains the information in the form
@@ -175,6 +206,22 @@ const int wifitimeout = 6; //in SECONDS.
 //the following variables will be automatically changed, if you have uploaded a configuration file named mqtt_config.txt to your ESP8266's SPIFFS memory.
 //You do NOT need to change them here, so that your actual topics can be kept in the mqtt_config.txt on the device, instead of uploading it to a public GitHub repository.
 char* mqttClientId = "MyDevice";
+
+//local MQTT:
+char* mqttBockfotznTopicLocal = "MyDevice/bo123/"; //MQTT Message received in topic 'MyDevice/bo123/'. Message: 'watschn' --> does not trigger from local
+char* mqttGetAggressiveTopicLocal = "MyDevice/getA123/";
+char* mqttMoveStepperTopicLocal = "MyDevice/moveS123/";
+char* mqttMultiwatschnTopicLocal = "MyDevice/multiw123/";
+char* mqttonlineTopicLocal = "MyDevice/status/";
+char* mqttfirmwareTopicLocal = "MyDevice/firmwareversion/";
+char* mqttWillTopicLocal = "MyDevice/online/";
+
+char *mqttServerLocal = "192.168.82.14";
+char *mqttUserLocal = "MyUserName";
+char *mqttPassLocal = "MyPassword";
+char *mqttPortLocal_txt = "1883"; //char variable to read from configuration text file mqtt_config.txt
+
+//global MQTT:
 char* mqttDevicenameTopic = "MyDevice/devicename/";
 char* mqttupdateTopic = "MyDevice/update/";
 char* mqttBockfotznTopic = "MyDevice/bockfotzn/";
@@ -184,12 +231,15 @@ char* mqttMultiwatschnTopic = "MyDevice/multiwatschn/";
 char* mqttonlineTopic = "MyDevice/status/";
 char* mqttfirmwareTopic = "MyDevice/firmwareversion/";
 char* mqttWillTopic = "MyDevice/online/";
-char *mqttServer = "broker.hivemq.com";
+//char *mqttServer = "broker.hivemq.com";
+char *mqttServer = "123456789999999999987654321a1.s1.eu.hivemq.cloud";
 char *mqttUser = "MyUserName";
 char *mqttPass = "MyPassword";
 char *mqttPort_txt = "1883"; //char variable to read from configuration text file mqtt_config.txt
 
+
 int mqttPort = 1883;//integer variable that will be overwritten with the content of *mqttPort_txt, if it can be read from mqtt config file.
+int mqttPortLocal = 1883;//integer variable that will be overwritten with the content of *mqttPort_txt, if it can be read from mqtt config file.
 
 //otherMQTT definitions (they are set in sketch as they dont contain private data. Therefore its not critical to upload this code publicly on github).
 
@@ -209,6 +259,10 @@ const char* validVarNames[] = { //attention: adding something (or changing arran
   "mqttonlineTopic",
   "mqttfirmwareTopic",
   "mqttWillTopic",
+  "mqttServerLocal",
+  "mqttPortLocal_txt",
+  "mqttUserLocal",
+  "mqttPassLocal",
   "mqttServer",
   "mqttPort_txt",
   "mqttUser",
@@ -232,6 +286,10 @@ char** mqttVars[numValidVarNames] = { //reihenfolge (und kommas nach jedem Eleme
   &mqttonlineTopic,
   &mqttfirmwareTopic,
   &mqttWillTopic,
+  &mqttServerLocal,
+  &mqttPortLocal_txt,
+  &mqttUserLocal,
+  &mqttPassLocal,
   &mqttServer,
   &mqttPort_txt,
   &mqttUser,
@@ -248,7 +306,7 @@ char** mqttVars[numValidVarNames] = { //reihenfolge (und kommas nach jedem Eleme
 ESPOTAGitHub ESPOTAGitHub(&certStore, GHOTA_USER, GHOTA_REPO, GHOTA_CURRENT_TAG, GHOTA_BIN_FILE, GHOTA_ACCEPT_PRERELEASE);
 
 
-MeshManager meshManager;
+//MeshManager meshManager;
 
 //comment Vince for github-auto-update:
 //currently ESP8266 has memory issues with that much code. it hangs when trying to update via github.
@@ -371,13 +429,19 @@ Timezone CE(CEST, CET);
 
 //set up wifimanager configuration
 WiFiManager wm;
+WiFiManagerParameter custom_mqtt_server_local("MQTT broker IP", "local mqtt server IP", "broker.hivemq.com", 40);
+WiFiManagerParameter custom_mqtt_user_local("MQTT broker user", "local mqtt user", "", 40);
+WiFiManagerParameter custom_mqtt_password_local("MQTT broker password", "local mqtt password", "", 40);
+WiFiManagerParameter custom_mqtt_port_local("MQTT server port", "local mqtt broker port", "1883", 5);
 WiFiManagerParameter custom_mqtt_server("MQTT broker IP", "mqtt server IP", "broker.hivemq.com", 40);
+WiFiManagerParameter custom_mqtt_user("MQTT broker user", "mqtt user", "", 40);
 WiFiManagerParameter custom_mqtt_password("MQTT broker password", "mqtt password", "", 40);
 WiFiManagerParameter custom_mqtt_port("MQTT server port", "mqtt broker port", "1883", 5);
 WiFiManagerParameter calibrate_rotationspeed; // global param ( for non blocking w params )
 WiFiManagerParameter calibrate_limitswitch; // global param ( for non blocking w params )
 WiFiManagerParameter forbid_global_watsch_alliance; // global param ( for non blocking w params )
 WiFiManagerParameter forbid_mesh_remote; // global param ( for non blocking w params )
+WiFiManagerParameter sofort_loswatschen; // global param ( for non blocking w params )
 
 bool verbiete_globale_watschn_allianz=false; //used to determine if global watsch network shall be joined
 bool verbiete_mesh_remote=false;
@@ -509,12 +573,16 @@ void read_mqtt_config_from_configfile() {
     MQTTconfigFile.close();
 
     mqttPort = atoi(&*mqttPort_txt); //set the content of the char variable that was read from config file into the int variable for MQTT configuration
+    mqttPortLocal = atoi(&*mqttPortLocal_txt); //set the content of the char variable that was read from config file into the int variable for MQTT configuration
+
 
 
 
     Serial.println(F("The MQTT settings are now set to:"));
     Serial.print(F("mqttClientId: "));
     Serial.println(mqttClientId);
+    Serial.println(F("adding ESP ChipID to mqttClientId to generate device-individual identifier:"));
+    add_ESPchip_ID_to_mqttClientId();
     Serial.print(F("mqttDevicenameTopic: "));
     Serial.println(mqttDevicenameTopic);
     Serial.print(F("mqttupdateTopic: "));
@@ -528,15 +596,30 @@ void read_mqtt_config_from_configfile() {
     Serial.println();
     Serial.print(F("Client name: '"));
     Serial.print(mqttClientId);
-    Serial.print(F("', MQTT broker '"));
+    Serial.println(F("'"));
+    Serial.println();
+    Serial.print(F("local MQTT broker '"));
+    Serial.print(mqttServerLocal);
+    Serial.print(F("' at port "));
+    Serial.print(mqttPortLocal);
+    Serial.println(F("."));
+    Serial.print(F("local MQTT Username: "));
+    Serial.println(mqttUserLocal);
+    Serial.print(F("local MQTT Password: "));
+    Serial.println(mqttPassLocal);
+    Serial.println();
+    
+    Serial.print(F("global MQTT broker: '"));
     Serial.print(mqttServer);
-    Serial.print(F("', at port "));
+    Serial.print(F("' at port "));
     Serial.print(mqttPort);
     Serial.println(F("."));
-    Serial.print(F("MQTT Username: "));
+    Serial.print(F("global MQTT Username: "));
     Serial.println(mqttUser);
-    Serial.print(F("MQTT Password: "));
+    Serial.print(F("global MQTT Password: "));
     Serial.println(mqttPass);
+    Serial.println();
+    Serial.print(F("globales Topics der Watschn-allianz: "));
     Serial.print(F("mqttBockfotznTopic: "));
     Serial.println(mqttBockfotznTopic);
     Serial.print(F("mqttGetAggressiveTopic: "));
@@ -724,7 +807,7 @@ void MultiWiFiCheck() {
   else {
     if (bestNetworkIndex >= 0) {
       Serial.println();
-      Serial.print(F("Strongest (known) network from .txt file: "));
+      Serial.print(F("Strongest (known) network from known_wifis.txt file in SPIFFS memory: "));
       Serial.print(WiFi.SSID(bestNetworkIndex));
       Serial.print(F(", signal strength: "));
       Serial.println(bestSignalStrength);
@@ -742,9 +825,9 @@ void MultiWiFiCheck() {
     }
   }
 
-  Serial.print(F("Connecting to "));
+  Serial.print(F("Connecting to Wifi '"));
   Serial.print(selectedSSID);
-  Serial.println(F("..."));
+  Serial.println(F("' ..."));
   WiFi.begin(selectedSSID.c_str(), selectedPassword.c_str());
 
   int WiFi_timeout_count = 0;
@@ -756,8 +839,8 @@ void MultiWiFiCheck() {
 
   if (WiFi.status() == WL_CONNECTED) {
     Serial.println();
-    Serial.println(F("successfully connected to WiFi."));
-    Serial.print(F("SSID: "));
+    Serial.print(F("successfully connected to WiFi with IP address "));
+    Serial.println(WiFi.localIP());
   } else {
     Serial.println();
     Serial.println(F("Failed to connect to WiFi."));
@@ -767,374 +850,275 @@ void MultiWiFiCheck() {
 
 
 void setup_GitHUB_OTA_upgrade() {
-//  Wire.begin(); // initialize I2C interface
-//  display.init();
-//  display.flipScreenVertically();
-//  display.setContrast(255);
-//  display.display();
+    if (drd.detectDoubleReset()) {
+        handleDoubleReset();
+        return; // Restart the ESP after handling double reset
+    }
 
-    
-//  Serial.begin(115200);
-//  Serial.println();
-//  Serial.println();
+    // Print startup information
+    printStartupInfo();
 
-  if (drd.detectDoubleReset()) {
+    // Initialize SPIFFS and check for certificates
+    SPIFFS.begin();
+    if (!initCertStore()) {
+        return; // Exit if no certificates are found
+    }
+
+    // WiFi connection setup
+    if (WiFi.SSID() == "") {
+        handleWiFiConnection();
+    }
+
+    // Initialize WiFiManager if necessary
+    if (WiFi.status() != WL_CONNECTED) {
+        initializeWiFiManager();
+    }
+
+    // Once WiFi is connected
+    Serial.println(F("Should now call setup_mqtt_config() and depending on #defines also setupLocalMQTT() and setupGlobalMQTT()"));
+    if (WiFi.status() == WL_CONNECTED) {
+      
+        setup_mqtt_config();
+        #ifdef USE_LOCAL_MQTT
+        setupLocalMQTT();
+        #endif
+        #ifdef USE_GLOBAL_MQTT
+        setupGlobalMQTT();
+        #endif
+        
+    } else {
+        handleWiFiConnectionFailure();
+    }
+
+    Serial.println(F("Setup finished. Going to loop() now"));
+    Serial.flush();
+}
+
+void handleDoubleReset() {
     Serial.println(F("======================== Double Reset Detected ========================"));
     digitalWrite(LED_BUILTIN, LOW);
+    Serial.println(F("Erasing WiFi credentials saved in WiFiManager - but will still connect to WiFi from known_wifis.txt in SPIFFS memory"));
     delay(1000);
-      wifiManager.resetSettings();
-      delay(100);
-      ESP.restart();
-  }
-  else{
+    wm.resetSettings();
+    delay(100);
+    ESP.restart();
+}
 
-
-  Serial.println();
-  Serial.println();
-//  i2cscan();
-//  PCF_20.begin();
-//  display.init();
-//  display.flipScreenVertically();
-//  display.setContrast(255);
-//  display.clear();
-//  delay(10);
-//  display.setFont(ArialMT_Plain_16);
-//  display.setTextAlignment(TEXT_ALIGN_CENTER_BOTH);
-    
-  Serial.begin(115200);
-  Serial.println();
-  Serial.println();
-  Serial.println();
-  drd.loop();
-  // generate device ID
-  uint32_t chip_id = ESP.getChipId();
-  sprintf(device_id, "%08X", chip_id);
-  
-  Serial.println();
-  Serial.println();
-  Serial.println(F("================================================================================"));
-  Serial.println(F("|                                                                              |"));
-  Serial.println(F("|                   WatschnMaster ist Teil der globalen                        |"));
-  Serial.println(F("|                   Watschn-Allianz im Bockfotzn-Netzwerk.                     |"));
-  Serial.println(F("|                =============================================                 |"));
-  Serial.print(F("|    Version:    "));
-  Serial.print(GHOTA_CURRENT_TAG);
-  Serial.println(F("                                                         |"));
-  Serial.println(F("|                                                                              |"));
-  Serial.println(F("|                - double reset will reset WiFi credentials -                  |"));
-  Serial.println(F("|                     - you may need to triple reset -                         |"));
-  Serial.println(F("================================================================================"));
-  Serial.println();
-  drd.loop();
-  Serial.println();
-
-  // Start SPIFFS and retrieve certificates.
-  SPIFFS.begin();
-  int numCerts = certStore.initCertStore(SPIFFS, PSTR("/certs.idx"), PSTR("/certs.ar"));
-  Serial.println();
-  Serial.println();
-  Serial.print(F("Reading CA certificates: "));
-  Serial.print(numCerts);
-  Serial.println(F(" certificates read. "));
-  if (numCerts == 0) {
+void printStartupInfo() {
     Serial.println();
+    Serial.println(F("================================================================================"));
+    Serial.println(F("|                                                                              |"));
+    Serial.println(F("|                   WatschnMaster is part of the global                        |"));
+    Serial.println(F("|                   Watschn-Allianz in the Bockfotzn network.                   |"));
+    Serial.println(F("|                =============================================                 |"));
+    Serial.print(F("|    Version:    "));
+    Serial.print(GHOTA_CURRENT_TAG);
+    Serial.println(F("                                                         |"));
+    Serial.println(F("|                                                                              |"));
+    Serial.println(F("|  - Double reset (power-OFF) will reset WiFi credentials from WiFi Manager -  |"));
+    Serial.println(F("|                     - You may need to triple reset -                         |"));
+    Serial.println(F("|                                                                              |"));
+    Serial.println(F("|    CODE:     https://github.com/lademeister/WatschnMaster                    |"));
+    Serial.println(F("================================================================================"));
     Serial.println();
-    Serial.println(F("################################################################################################################################################################"));
-    Serial.println(F("No certificates found. Did you run certs-from-mozilla.py (contained in this repository) on your computer and upload the file 'certs.ar' to the SPIFFS memory section on ESP8266 before flashing this sketch to the device?"));
-    Serial.println(F("To upload files to ESP8266's SPIFFS memory I suggest this plugin for Arduino IDE: https://github.com/esp8266/arduino-esp8266fs-plugin, "));
-    Serial.println(F("which will create an entry called 'ESP8266 sketch data upload' in the tools menu. One press uploads all files in the 'data' folder of the sketch."));
-    Serial.println(F("All files that you want to upload to SPIFFS memory section must be in the 'data' folder."));
-    Serial.println(F("The 'data' folder can be the one in the Arduino/libraries/ESP_OTA_GitHub/examples/data folder if you are using the example code, or can be in your local code area where you store your projects if you have saved already.\n There it would most likely be found in ESP_OTA_GitHub/examples/data"));
-    Serial.println(F("HINT: If sketch data upload doesn't work, make sure that serial monitor window is closed."));
-    Serial.println(F("At the end, you want to upload certs.ar, mqtt_config.txt and known_wifis.txt to SPIFFS memory of your ESP8266."));
-    Serial.println(F("Important: if compiling for generic ESP8266, set Tools/erase flash to 'all flash contents' to also delete SPIFFS contents. This is NOT necessary for overwriting files."));
-    Serial.println(F("Usually you will set that to 'sketch only'."));
-    return; // Can't connect to anything w/o certs!
-  }
+}
 
+bool initCertStore() {
+    int numCerts = certStore.initCertStore(SPIFFS, PSTR("/certs.idx"), PSTR("/certs.ar"));
+    Serial.print(F("Reading CA certificates: "));
+    Serial.print(numCerts);
+    Serial.println(F(" certificates read."));
+    if (numCerts == 0) {
+        Serial.println(F("No certificates found. Make sure you have uploaded the 'certs.ar' file to SPIFFS."));
+        return false;
+    }
+    return true;
+}
 
-  //readWifiCredentials();
-  if (WiFi.SSID() == "") {
-    // WiFiManager was not previously connected to a network
-    Serial.println(F("It seems that WiFiManager was not previously connected to a network"));
-    // Perform setup for first-time use
+void handleWiFiConnection() {
+    Serial.println(F("It seems that WiFiManager was not previously connected to a network."));
+    Serial.println(F("Performing setup for first-time use."));
     read_known_wifi_credentials_from_configfile();
     MultiWiFiCheck();
-    // read_mqtt_config_from_configfile();
 
-
-
-    if (WiFi.status() != WL_CONNECTED) { //only start wifi manager if we do not yet have a wifi connection from preset wifis
-      Serial.println();
-      Serial.println(F("It was not possible to connect to one of the known WiFi's."));
-      Serial.println();
-      Serial.print(F("Starting WiFiManager now. Please connect to the access Point '"));
-      Serial.print(wm_accesspointname);
-      Serial.print(F("' within "));
-      Serial.print(wm_accesspointtimeout);
-      Serial.println(F("s timeout."));
-      Serial.println();
-      Serial.println();
-      Serial.println();
+    if (WiFi.status() != WL_CONNECTED) {
+        Serial.println();
+        Serial.println(F("Could not connect to any known WiFi networks."));
+        Serial.print(F("Starting WiFiManager. Please connect to the access point '"));
+        Serial.print(wm_accesspointname);
+        Serial.print(F("' within "));
+        Serial.print(wm_accesspointtimeout);
+        Serial.println(F(" seconds timeout."));
+        Serial.println();
     }
-  } else {
-    // WiFiManager was previously connected to a network
-    // Perform setup for subsequent use
-  }
-
-
-  //initialize WiFiManager
-  if (WiFi.status() != WL_CONNECTED) { //only start wifi manager if we do not yet have a wifi connection from preset wifis
-    //WiFiManager wifiManager;
-    wifiManager.setConfigPortalBlocking(false);
-    //wifiManager.setSaveParamsCallback(saveParamsCallback);
-
-    //------------------
-
-  // set dark theme
-    wifiManager.setClass("invert");
-
-    
-    wifiManager.setTimeout(wifitimeout);
-
-
-
-    //
-    //   //Open known_wifis.txt file for reading
-    //  File configFile = SPIFFS.open("/known_wifis.txt", "r");
-    //  if (!configFile) {
-    //    Serial.println(F("Failed to open known_wifis.txt file"));
-    //    return;
-    //  }
-    //
-    //  //Read wifi credentials from known_wifis.txt and add to WiFiManager
-    //  while (configFile.available()) {
-    //    String line = configFile.readStringUntil('\n');
-    //    int separatorIndex = line.indexOf('/');
-    //    if (separatorIndex != -1) {
-    //      String ssid = line.substring(0, separatorIndex);
-    //      String password = line.substring(separatorIndex + 1);
-    //      //wifiManager.addAPNode("ssid", "password");
-    //
-    //    }
-    //  }
-    //
-    //  configFile.close();
-
-
-
-
-
-    //set minimum quality of signal to be connected to wifi network
-    //default is 8%, but you can set it higher for more reliability
-    //wifiManager.setMinimumSignalQuality(20);
-
-    //set config portal timeout
-    wifiManager.setConfigPortalTimeout(30);
-
-    //set custom parameters for the configuration portal
-    //wifiManager.setAPCallback(yourCallbackFunction);
-    //wifiManager.setAPStaticIPConfig(yourIPConfig);
-    //wifiManager.setSTAStaticIPConfig(yourSTAIPConfig);
-
-
-    wifiManager.autoConnect(wm_accesspointname);
-
-    //  testing  to add wifis - doesnt compile with this version of wifimanager but there should be versions that accept that command.
-    //  Serial.println(F("testing  to add wifis to wifimanager"));
-    //  wifiManager.addAP("SSID1", "password1"); //should work but doesn't work with this verison of wifimanager, so we try to connect manually to the networks saved in textfile and cannot use this here.
-    //  wifiManager.addAP("SSID2", "password2");
-
-
-
-    wifiManager.setTimeout(wifitimeout);
-    //
-    //  // Connect to WiFi
-    //  Serial.print("Connecting to WiFi... ");
-    //  WiFi.mode(WIFI_STA);
-    //  WiFi.begin(STASSID, STAPSK);
-    //  if ((WiFi.status() != WL_CONNECTED)) {
-    //    Serial.print("... ");
-    //  }
-    Serial.println();
-  }
-
-  //  Serial.println(F("Waiting for WiFiMAnager to be stopped."));
-  //// Wait until WiFiManager is unloaded
-  //  while (!wifiManager.getWiFiIsSaved()) {
-  //    delay(1000);
-  //    Serial.println(F("Waiting for WiFiManager to unload..."));
-  //  }
-
-  // Now that WiFiManager is unloaded, we can continue with the rest of the program
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.println(F("WiFi connected."));
-    // Print the name of the WiFi network
-    Serial.print(F("Connected to WiFi '"));
-    Serial.print(WiFi.SSID());
-    Serial.println(F("'."));
-    wifiManager.stopConfigPortal();
-    Serial.println(F("Config portal stopped."));
-    nowtime = millis();
-    if (nowtime - boottime < 7000) {
-      Serial.println(F("fresh boot."));
-      delay(2000);
-      Serial.println(F("...waiting a short time to establish and stabilize WiFi connection."));
-      delay(2000);
-    }
-    if (check_OTA_on_boot) { //if flag is set, check for an update when starting
-      check_ota_github();
-    }
-    /* End of check and upgrade code */
-  } else {
-    // code to be executed when there is no successful WiFi connection
-    Serial.println(F("WiFi could not be connected: \n- no success to connect to preset WiFi's. \n- WifiManager timed out, or \n- Wifi credentials were not entered correctly. \n\nSkipping check for Firmware update due to missing internet connection.\nReboot to try again. \nNow proceeding with void loop()."));
-  }
-
-
-
-  if (WiFi.status() == WL_CONNECTED) { //only read mqtt config and set mqtt client if we are already connected to wifi
-    Serial.println(F("setting up MQTT."));
-    // Set up MQTT client
-    setup_mqtt_config();
-
-    //mqttClient.setCredentials(mqttUsername, mqttPassword);
-
-    // Set up MQTT LWT
-    //mqttClient.setWill(mqttWillTopic, mqttWillMessage);
-    // Set the LWT message
-    //  mqttClient.setWillTopic(mqttWillTopic);
-    //  mqttClient.setWillMessage(mqttWillMessage);
-
-    //++++++++++++++++++++++ OFF FOR DEBUG
-    //  // Connect to MQTT broker
-    //  mqttClient.setServer(mqttServer, mqttPort);
-    //  mqttClient.setCallback(mqttCallback);
-
-    int mqtt_connection_tries = 0;
-    while (!(mqttClient.connect(mqttClientId, mqttUser, mqttPass)) && mqtt_connection_tries < maximum_mqtt_connection_tries) {
-
-      //while (!mqttClient.connect(mqttClientId, mqttUser, mqttPass)) {
-      //while (!mqttClient.connect(mqttClientId, mqttUser, mqttPass, mqttWillTopic, mqttwillQoS, mqttwillRetain, mqttWillMessage, mqttcleanSession)) {
-
-
-
-      Serial.print(F("MQTT: "));
-      Serial.print(mqttClientId);
-      Serial.print(F(" trying to connect as User '"));
-      Serial.print(mqttUser);
-      Serial.print(F("' with password '"));
-      Serial.print(mqttPass);
-      Serial.print(F("' to "));
-
-      Serial.print(mqttServer);
-      Serial.print(F(" at Port "));
-      Serial.println(mqttPort);
-      mqtt_connection_tries++;
-      delay(1000);
-
-    }
-    mqtt_connection_tries = 0;
-    if (mqttClient.connected()) {
-      // Publish online message to MQTT broker
-      mqttClient.publish(mqttWillTopic, "Online", true); //needs correct setup with 'will topic' to work correctly (see OpenMQTTGateway for example)
-      publish_device_info();
-      mqttClient.publish(mqttfirmwareTopic, GHOTA_CURRENT_TAG, true);
-      Serial.print(F("Firmware version published to '"));
-      Serial.print(mqttfirmwareTopic);
-      Serial.println(F("."));
-      mqttClient.subscribe(mqttupdateTopic);
-      Serial.println();
-      Serial.print(F("Device is now participating in the global Watsch Alliance and is subscribed to topic '"));
-      Serial.print(mqttupdateTopic);
-      Serial.println(F("' and to '"));
-      Serial.println(mqttBockfotznTopic);
-      mqttClient.subscribe(mqttBockfotznTopic);
-      Serial.println(F("mqttGetAggressiveTopic"));
-      mqttClient.subscribe(mqttGetAggressiveTopic);
-      Serial.println(F("mqttMoveStepperTopic"));
-      mqttClient.subscribe(mqttMoveStepperTopic);
-      Serial.println(F("mqttMultiwatschnTopic"));
-      mqttClient.subscribe(mqttMultiwatschnTopic);
-
-
-      
-      Serial.print(F("' on "));
-      Serial.print(mqttServer);
-      Serial.println(F("Publish the message 'update' to the update topic, to manually"));
-      Serial.println(F("start an OTA firmware update from GitHub repository. INFO: Due to a lot code in this sketch, currently ESP8266 is running out of memory when handling GitHub web page connection."));
-      Serial.println(F("update syntax for MacOS / Linux shell for this device:"));
-      Serial.print(F("mosquitto_pub -h broker.hivemq.com -p 1883 -t '"));
-      Serial.print(mqttupdateTopic);
-      Serial.println(F("' -m 'update'"));
-      Serial.println();
-      Serial.println(F("Publish the message 'watschn', 'schelln', 'kuerbis_soft' and 'kuerbis_hard' to the bockfotzntopic, to remotely"));
-      Serial.println(F("start beating the shit aut of Schindlers Birne.")); 
-      Serial.println(F("The following topics allow entering a number as message in the topic to adjust the outcome:"));
-      Serial.println(mqttGetAggressiveTopic);
-      Serial.println(mqttMoveStepperTopic);
-      Serial.println(mqttMultiwatschnTopic);
-      Serial.println(F("--- EXAMPLES: ---"));
-      Serial.println(F("give a solide Watschn:"));
-      Serial.print(F("mosquitto_pub -h broker.hivemq.com -p 1883 -t '"));
-      Serial.print(mqttBockfotznTopic);
-      Serial.println(F("' -m 'watschn'"));
-      Serial.println(F("give a Schelln:"));
-      Serial.print(F("mosquitto_pub -h broker.hivemq.com -p 1883 -t '"));
-      Serial.print(mqttBockfotznTopic);
-      Serial.println(F("' -m 'schelln'"));
-      Serial.println(F("soft multi-hitting to wake up the Kürbis of Mr. Schindler:"));
-      Serial.print(F("mosquitto_pub -h broker.hivemq.com -p 1883 -t '"));
-      Serial.print(mqttBockfotznTopic);
-      Serial.println(F("' -m 'kuerbis_soft'"));
-      Serial.println(F("Hard multi-hitting the Kürbis of Mr. Schindler:"));
-      Serial.print(F("mosquitto_pub -h broker.hivemq.com -p 1883 -t '"));
-      Serial.print(mqttBockfotznTopic);
-      Serial.println(F("' -m 'kuerbis_hard'"));
-      Serial.println(F("give 5 Watschn:"));
-      Serial.print(F("mosquitto_pub -h broker.hivemq.com -p 1883 -t '"));
-      Serial.print(mqttMultiwatschnTopic);
-      Serial.println(F("' -m '5'"));
-      Serial.println(F("get aggressive with aggression level 3:"));
-      Serial.print(F("mosquitto_pub -h broker.hivemq.com -p 1883 -t '"));
-      Serial.print(mqttGetAggressiveTopic);
-      Serial.println(F("' -m '3'"));
-      Serial.println(F("move Stepper 78 steps:"));
-      Serial.print(F("mosquitto_pub -h broker.hivemq.com -p 1883 -t '"));
-      Serial.print(mqttMoveStepperTopic);
-      Serial.println(F("' -m '78'"));
-
-    }
-    else {
-      Serial.println(F("ERROR: MQTT connection not successful."));
-    }
-    Serial.println();
-    //ALTERNATIVE, BETTER, USING WILLTOPIC (doesn't work with this pubsub library):
-    //mqttClient.setWill(mqttWillTopic, "Offline");
-    //mqttClient.publish(mqttWillTopic, "Online", true);
-
-
-    //++++++++++++++++++++++
-    setup_local_OTA();
-  }
-  else {
-    Serial.println(F("skipping MQTT connection due to missing Internet connectivity."));
-    Serial.print(F("WiFiManager started, please connect to AP '"));
-    Serial.print(wm_accesspointname);
-    Serial.println(F("' to configure WiFi."));
-  }
-  Serial.println(F("--------------------"));
-  lastReconnectAttempt = 0;
-  if (WiFi.status() == WL_CONNECTED) {
-      Serial.print(F("this device is connected to WiFi '"));
-      delay(100);
-      Serial.print(WiFi.SSID());
-      Serial.print(F("' with IP address: "));
-      Serial.println(WiFi.localIP());
-    }
-  Serial.println(F("Setup finished. going to loop() now"));
-  }
 }
+
+void initializeWiFiManager() {
+    WiFiManager wifiManager;
+    wifiManager.setConfigPortalBlocking(true);
+    wifiManager.setSaveParamsCallback(saveParamsCallback);
+    wifiManager.setTimeout(wifitimeout);
+    wifiManager.autoConnect(wm_accesspointname);
+}
+
+void setupGlobalMQTT() {
+//    display.clear();
+//    delay(10);
+//    display.setFont(ArialMT_Plain_16);
+//    display.setTextAlignment(TEXT_ALIGN_CENTER_BOTH);
+//    display.drawString(display.getWidth() / 2, 31, "trying to connect\nto global MQTT\nWatschn-Allianz\n(Bockfotzn-Netzwerk)");
+//    display.display();
+    
+    Serial.println(F("Setting up global MQTT client (Globale Watschn-Allianz):"));
+    //setup_mqtt_config();
+    connectToMQTT(mqttClient, mqttServer, mqttPort, mqttUser, mqttPass);
+
+    if (mqttClient.connected()) {
+        mqttClient.publish(mqttWillTopic, "Online", true);
+        publish_device_info();
+        mqttClient.publish(mqttfirmwareTopic, GHOTA_CURRENT_TAG, true);
+
+        // Subscribe to MQTT topics
+        mqttClient.subscribe(mqttupdateTopic);
+        mqttClient.subscribe(mqttBockfotznTopic);
+        mqttClient.subscribe(mqttGetAggressiveTopic);
+        mqttClient.subscribe(mqttMoveStepperTopic);
+        mqttClient.subscribe(mqttMultiwatschnTopic);
+
+        Serial.println(F("Device is now participating in the 'Globale Watschn-Allianz'."));
+        printMQTTCommandExamples();
+    } else {
+        Serial.println(F("ERROR: Global MQTT connection to Watschn-Allianz not successful."));
+    }
+}
+
+void setupLocalMQTT() {
+//    display.clear();
+//    delay(10);
+//    display.setFont(ArialMT_Plain_16);
+//    display.setTextAlignment(TEXT_ALIGN_CENTER_BOTH);
+//    display.drawString(display.getWidth() / 2, 31, "trying to connect\nto local MQTT");
+//    display.display();
+    Serial.println();
+    Serial.println(F("Setting up local MQTT client:"));
+    //setup_mqtt_config(); // Ensure this function sets up local MQTT parameters
+    connectToMQTT(mqttClientLocal, mqttServerLocal, mqttPortLocal, mqttUserLocal, mqttPassLocal);
+
+    if (mqttClientLocal.connected()) {
+        mqttClientLocal.publish(mqttWillTopicLocal, "Online", true);
+        publish_device_info(); // Adapt this if needed for local MQTT
+
+        // Subscribe to local MQTT topics (interims-Topics, später: nutze untere kommentierte) -  also at another place in code!! around line 1445
+        mqttClientLocal.subscribe(mqttupdateTopic);
+        mqttClientLocal.subscribe(mqttBockfotznTopicLocal);
+        mqttClientLocal.subscribe(mqttGetAggressiveTopicLocal);
+        mqttClientLocal.subscribe(mqttMoveStepperTopicLocal);
+        mqttClientLocal.subscribe(mqttMultiwatschnTopicLocal);
+        
+        // Subscribe to local MQTT topics
+//        mqttClient.subscribe(mqttupdateTopic);
+//        mqttClient.subscribe(mqttBockfotznTopic);
+//        mqttClient.subscribe(mqttGetAggressiveTopic);
+//        mqttClient.subscribe(mqttMoveStepperTopic);
+//        mqttClient.subscribe(mqttMultiwatschnTopic);
+
+        Serial.println(F("Device is now participating in the local MQTT network."));
+    } else {
+        Serial.println(F("ERROR: Local MQTT connection not successful."));
+    }
+}
+
+//void connectToMQTT(PubSubClient &client, const char* server, int port, const char* user, const char* pass) {
+//    int mqtt_connection_tries = 0;
+//    while (!(client.connect(mqttClientId, user, pass)) && mqtt_connection_tries < maximum_mqtt_connection_tries) {
+//        Serial.print(F("MQTT: Trying to connect as clientID '"));
+//        Serial.print(mqttClientId);
+//        Serial.print(F("' to MQTT server "));
+//        Serial.print(server);
+//        Serial.print(F(" at Port "));
+//        Serial.print(port);
+//        Serial.print(F(" with user '"));
+//        Serial.print(user);
+//        Serial.print(F("'"));
+//        Serial.print(F(" and passwort '"));
+//        Serial.print(pass);
+//        Serial.println(F("'"));
+//        
+//        mqtt_connection_tries++;
+//        delay(1000);
+//    }
+//}
+
+void connectToMQTT(PubSubClient &client, const char* server, int port, const char* user, const char* pass) {
+    int mqtt_connection_tries = 0;
+
+    // Print out connection parameters before attempting to connect
+    Serial.println(F("### MQTT Connection Parameters ###"));
+    Serial.print(F("Client ID: "));
+    Serial.println(mqttClientId);
+    Serial.print(F("Server: "));
+    Serial.println(server);
+    Serial.print(F("Port: "));
+    Serial.println(port);
+    Serial.print(F("User: "));
+    Serial.println(user);
+    Serial.print(F("Password: "));
+    Serial.println(pass);
+    Serial.println(F("################################"));
+    
+
+    // Attempt to connect to the MQTT broker
+    while (!(client.connect(mqttClientId, user, pass)) && mqtt_connection_tries < maximum_mqtt_connection_tries) {
+        Serial.print(F("MQTT: Trying to connect as clientID '"));
+        Serial.print(mqttClientId);
+        Serial.print(F("' to MQTT server "));
+        Serial.print(server);
+        Serial.print(F(" at Port "));
+        Serial.print(port);
+        Serial.print(F(" with user '"));
+        Serial.print(user);
+        Serial.print(F("'"));
+        Serial.print(F(" and password '"));
+        Serial.print(pass);
+        Serial.println(F("'"));
+        
+        mqtt_connection_tries++;
+        delay(1000);
+    }
+
+    if (client.connected()) {
+        Serial.println(F("MQTT: Connected successfully."));
+    } else {
+        Serial.println(F("MQTT: Failed to connect after maximum tries."));
+    }
+}
+
+
+void printMQTTCommandExamples() {
+    Serial.println(F("Update syntax for MacOS / Linux shell for this device:"));
+    Serial.print(F("mosquitto_pub -h "));
+    Serial.print(mqttServer);
+    Serial.print(F(" -p "));
+    Serial.print(mqttPort);
+    Serial.print(F(" -t "));
+    Serial.print(mqttupdateTopic);
+    Serial.print(F(" -m update -u "));
+    Serial.print(mqttUser);
+    Serial.print(F(" -P "));
+    Serial.print(mqttPass);
+    Serial.println(F(" --insecure"));
+    // Additional examples as needed
+}
+
+void handleWiFiConnectionFailure() {
+    Serial.println(F("WiFi could not be connected:"));
+    Serial.println(F("- No success to connect to preset WiFi's."));
+    Serial.println(F("- WiFiManager timed out, or"));
+    Serial.println(F("- WiFi credentials were not entered correctly."));
+    Serial.println(F("Skipping check for Firmware update due to missing internet connection."));
+    Serial.println(F("Reboot to try again."));
+}
+
 /****** root certificate *********/
 
 static const char *root_ca PROGMEM = R"EOF(
@@ -1171,6 +1155,98 @@ emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
 -----END CERTIFICATE-----
 )EOF";
 
+
+//void add_ESPchip_ID_to_mqttClientId(){
+//    // Get the ESP8266 Chip ID
+//  uint32_t chipID = ESP.getChipId();
+//
+//  // Convert the chip ID to a string and append it to mqttClientId
+//  snprintf(mqttClientId + strlen(mqttClientId), sizeof(mqttClientId) - strlen(mqttClientId), "-%08X", chipID);
+//
+//  // Now mqttClientId contains the final mqttClientId with the chip ID
+//  Serial.print("Final MQTT Client ID: ");
+//  Serial.println(mqttClientId);
+//}
+
+//void add_ESPchip_ID_to_mqttClientId(){
+//    // Get the ESP8266 Chip ID
+//    uint32_t chipID = ESP.getChipId();
+//
+//    // Determine the length of the original mqttClientId
+//    size_t originalLength = strlen(mqttClientId);
+//
+//    // Estimate the length needed to append the chip ID (8 characters + 1 for '-')
+//    size_t additionalLength = 9; // "-%08X" is 9 characters long
+//
+//    // Allocate sufficient memory for the final mqttClientId
+//    char* finalMqttClientId = (char*)malloc(originalLength + additionalLength + 1);
+//
+//    if (finalMqttClientId != nullptr) {
+//        // Copy the original mqttClientId to the new memory location
+//        strcpy(finalMqttClientId, mqttClientId);
+//
+//        // Append the chip ID to the new mqttClientId
+//        snprintf(finalMqttClientId + originalLength, additionalLength + 1, "-%08X", chipID);
+//
+//        // Replace the original mqttClientId with the new one
+//        mqttClientId = finalMqttClientId;
+//
+//        // Output the final result
+//        Serial.print(F("mqttClientId is now: "));
+//        Serial.println(mqttClientId);
+//
+//        // Note: No need to free the memory if you're using mqttClientId afterward.
+//    } else {
+//        Serial.println("Failed to allocate memory for the final MQTT Client ID.");
+//    }
+//}
+
+void add_ESPchip_ID_to_mqttClientId() {
+    // Get the ESP8266 Chip ID
+    uint32_t chipID = ESP.getChipId();
+    char chipIDStr[9]; // Buffer to hold the chip ID string in hex format
+
+    // Convert the chip ID to a string
+    snprintf(chipIDStr, sizeof(chipIDStr), "%08X", chipID);
+
+    // Determine the length of the original mqttClientId
+    size_t originalLength = strlen(mqttClientId);
+    
+    // Length of chipIDStr including the hyphen
+    size_t suffixLength = strlen(chipIDStr) + 1; // "+1" for the hyphen
+    
+    // Check if mqttClientId already ends with "-chipID"
+    if (originalLength >= suffixLength && 
+        strcmp(mqttClientId + originalLength - suffixLength + 1, chipIDStr) == 0) {
+        Serial.println(F("mqttClientId already ends with the chip ID."));
+        return; // Chip ID is already appended; no need to change mqttClientId
+    }
+
+    // Allocate memory for the new mqttClientId
+    size_t newLength = originalLength + suffixLength + 1; // +1 for null terminator
+    char* finalMqttClientId = (char*)malloc(newLength);
+
+    if (finalMqttClientId != nullptr) {
+        // Copy the original mqttClientId to the new memory location
+        strcpy(finalMqttClientId, mqttClientId);
+
+        // Append the chip ID to the new mqttClientId
+        snprintf(finalMqttClientId + originalLength, suffixLength + 1, "-%s", chipIDStr);
+
+        // Replace the original mqttClientId with the new one
+        free(mqttClientId); // Free the old mqttClientId if previously allocated
+        mqttClientId = finalMqttClientId;
+
+        // Output the final result
+        Serial.print(F("mqttClientId is now: "));
+        Serial.println(mqttClientId);
+    } else {
+        Serial.println(F("Failed to allocate memory for the final MQTT Client ID."));
+    }
+}
+
+
+
 //old 
 //void setup_mqtt_config() {
 //  read_mqtt_config_from_configfile();
@@ -1184,21 +1260,54 @@ emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
 // ESP8266-specific SSL/TLS configuration
 void setup_mqtt_config() {
   read_mqtt_config_from_configfile();
-  secureClient.setInsecure();  // Disable certificate verification for ESP8266
+  Serial.println(F("### can NOT use certificates for MQTT connection because ESP8266 does not support it ###"));
+  secureClientGlobal.setInsecure();  // Disable certificate verification for ESP8266
+  //secureClientLocal.setInsecure();  // Disable certificate verification for ESP8266 //commented out when using normal client instead of secure client
+  #ifdef USE_GLOBAL_MQTT
   mqttClient.setServer(mqttServer, mqttPort);
   mqttClient.setCallback(mqttCallback);
+  #endif
+  #ifdef USE_LOCAL_MQTT
+  mqttClientLocal.setServer(mqttServerLocal, mqttPortLocal);
+  mqttClientLocal.setCallback(mqttCallback);
+  #endif
   Serial.println(F("MQTT broker settings and MQTT callback setting: done."));
 }
 #else
 // For ESP32 or other platforms where certificate is used
 void setup_mqtt_config() {
   read_mqtt_config_from_configfile();
-  secureClient.setCACert(root_ca);  // Provide the CA certificate for verification
+  if (numCerts > 0) {
+    // Set CertStore for secureClient
+  #ifdef USE_GLOBAL_MQTT
+    secureClientGlobal.setCertStore(&certStore);
+    #endif
+    #ifdef USE_LOCAL_MQTT
+    secureClientLocal.setCertStore(&certStore);
+    #endif
+    Serial.println(F("Using certificate certs.ar/certs.idx from SPIFFS for MQTT connection."));
+  } else {
+    Serial.println(F("No certificate found in SPIFFS, MQTT connection may fail. Trying to use hardcoded certificate instead."));
+    #ifdef USE_LOCAL_MQTT
+    secureClientLocal.setCACert(root_ca);  // Provide the CA certificate for verification
+    #endif
+    #ifdef USE_GLOBAL_MQTT
+    secureClientGlobal.setCACert(root_ca);  // Provide the CA certificate for verification
+    #endif
+  }
+  #ifdef USE_GLOBAL_MQTT
   mqttClient.setServer(mqttServer, mqttPort);
   mqttClient.setCallback(mqttCallback);
+  #endif
+  #ifdef USE_LOCAL_MQTT
+  mqttClientLocal.setServer(mqttServerLocal, mqttPortLocal);
+  mqttClientLocal.setCallback(mqttCallback);
+  #endif
   Serial.println(F("MQTT broker settings and MQTT callback setting: done."));
-}
+  }
 #endif
+
+
 
 
 
@@ -1334,9 +1443,9 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
       check_ota_github();
     }
   }
-  else if (strcmp(topic, mqttBockfotznTopic) == 0) {
+  else if ((strcmp(topic, mqttBockfotznTopic) == 0)||(strcmp(topic, mqttBockfotznTopicLocal) == 0)) {
     if (message == "watschn") {
-      Serial.println(F("Aufruf 'schwungholen_und_watschen(bool retransmit_message)' aus der globalen Watsch-Allianz über das Bockfotzn-Netzwerk."));
+      Serial.println(F("Aufruf 'schwungholen_und_watschen(bool retransmit_message)' aus der globalen Watsch-Allianz über das Bockfotzn-Netzwerk oder über lokal."));
       schwungholen_und_watschen(0);
     }
     else if (message == "schelln") {
@@ -1401,56 +1510,251 @@ void setupMQTT() {
   mqttClient.setCallback(mqttCallback);
 }
 
-boolean reconnect() {
-  setupMQTT();
+//boolean reconnect_global(){
+//   setupGlobalMQTT();
+//
+//  // Attempt to reconnect global MQTT client
+//  if (!mqttClient.connected()) {
+//      Serial.print(F("Global MQTT: Attempting to reconnect using client name '"));
+//      Serial.print(mqttClientId);
+//      Serial.print(F("' as user '"));
+//      Serial.print(mqttUser);
+//      Serial.print(F("' with password '"));
+//      Serial.print(mqttPass);
+//      Serial.print(F("' to server "));
+//      Serial.print(mqttServer);
+//      Serial.print(F(" at Port "));
+//      Serial.println(mqttPort);
+//
+//      if (mqttClient.connect(mqttClientId, mqttUser, mqttPass)) {
+//          Serial.println(F("(Global MQTT) Reconnected."));
+//          mqttClient.publish(mqttDevicenameTopic, mqttClientId);
+//          mqttClient.publish(mqttonlineTopic, "online"); // Will be set up with will message
+//          publish_device_info();
+//          mqttClient.publish(mqttfirmwareTopic, GHOTA_CURRENT_TAG, true); // Retained message
+//          mqttClient.subscribe(mqttupdateTopic);
+//          mqttClient.subscribe(mqttBockfotznTopic);
+//          mqttClient.subscribe(mqttGetAggressiveTopic);
+//          mqttClient.subscribe(mqttMoveStepperTopic);
+//          mqttClient.subscribe(mqttMultiwatschnTopic);
+//          return true;
+//      } else {
+//          Serial.print(F("Global MQTT connection failed. Error: "));
+//          Serial.println(mqttClient.state());
+//          return false;
+//      }
+//  }
+//}
+//
+//boolean reconnect_local(){
+//    setupLocalMQTT();
+//
+// 
+//
+//  // Attempt to reconnect local MQTT client
+//  if (!mqttClientLocal.connected()) {
+//      Serial.print(F("Local MQTT: Attempting to reconnect using client name '"));
+//      Serial.print(mqttClientId);
+//      Serial.print(F("' as user '"));
+//      Serial.print(mqttUserLocal);
+//      Serial.print(F("' with password '"));
+//      Serial.print(mqttPassLocal);
+//      Serial.print(F("' to server "));
+//      Serial.print(mqttServerLocal);
+//      Serial.print(F(" at Port "));
+//      Serial.println(mqttPortLocal);
+//
+//      if (mqttClientLocal.connect(mqttClientId, mqttUserLocal, mqttPassLocal)) {
+//          Serial.println(F("(Local MQTT) Reconnected."));
+//          mqttClientLocal.publish(mqttDevicenameTopic, mqttClientId);
+//          mqttClientLocal.publish(mqttonlineTopicLocal, "online"); // Will be set up with will message
+////          publish_device_info(); // Adapt if necessary for local MQTT
+//
+//
+////interims-topics - use commented ones below later. also at another place in code!!  (around line 963)
+//          mqttClientLocal.subscribe(mqttupdateTopic);
+//          mqttClientLocal.subscribe(mqttBockfotznTopicLocal);
+//          mqttClientLocal.subscribe(mqttGetAggressiveTopicLocal);
+//          mqttClientLocal.subscribe(mqttMoveStepperTopicLocal);
+//          mqttClientLocal.subscribe(mqttMultiwatschnTopicLocal);
+//
+////          mqttClient.subscribe(mqttupdateTopic);
+////          mqttClient.subscribe(mqttBockfotznTopic);
+////          mqttClient.subscribe(mqttGetAggressiveTopic);
+////          mqttClient.subscribe(mqttMoveStepperTopic);
+////          mqttClient.subscribe(mqttMultiwatschnTopic);
+//       return true;
+//      } else {
+//          Serial.print(F("Local MQTT connection failed. Error: "));
+//          Serial.println(mqttClientLocal.state());
+//          return false;
+//      }
+//  }
+//}
 
-  //++++++++++++ MQTT  DEBUG ONLY
+boolean reconnect_global() {
+    setupGlobalMQTT();
 
-  if (!mqttClient.connected()) {
-    Serial.print(F("MQTT: trying to connect as "));
-    Serial.print(mqttClientId);
-    Serial.print(F(" to "));
+    // Attempt to reconnect global MQTT client
+    if (!mqttClient.connected()) {
+        Serial.print(F("Global MQTT: Attempting to reconnect using client name '"));
+        Serial.print(mqttClientId);
+        Serial.print(F("' as user '"));
+        Serial.print(mqttUser);
+        Serial.print(F("' with password '"));
+        Serial.print(mqttPass);
+        Serial.print(F("' to server "));
+        Serial.print(mqttServer);
+        Serial.print(F(" at Port "));
+        Serial.println(mqttPort);
 
-    Serial.print(mqttServer);
-    Serial.print(F(" at Port "));
-    Serial.println(mqttPort);
-
-    if (mqttClient.connect(mqttClientId, mqttUser, mqttPass)) {
-      Serial.println(F("Connected."));
-      mqttClient.publish(mqttDevicenameTopic, mqttClientId);
-      mqttClient.publish(mqttonlineTopic, " online"); //should be set up with will message so that "offline" appears automatically set by the MQTT broker when the device is offline
-      publish_device_info();
-      mqttClient.publish(mqttfirmwareTopic, GHOTA_CURRENT_TAG, true); //true makes the message retained, so that you can see which firmware version the device had when it was last connected.
-
-
-      mqttClient.subscribe(mqttupdateTopic);
-      mqttClient.subscribe(mqttBockfotznTopic);
-      mqttClient.subscribe(mqttGetAggressiveTopic);
-      mqttClient.subscribe(mqttMoveStepperTopic);
-      mqttClient.subscribe(mqttMultiwatschnTopic);
+        if (mqttClient.connect(mqttClientId, mqttUser, mqttPass)) {
+            Serial.println(F("(Global MQTT) Reconnected."));
+            mqttClient.publish(mqttDevicenameTopic, mqttClientId);
+            mqttClient.publish(mqttonlineTopic, "online"); // Will be set up with will message
+            publish_device_info();
+            mqttClient.publish(mqttfirmwareTopic, GHOTA_CURRENT_TAG, true); // Retained message
+            mqttClient.subscribe(mqttupdateTopic);
+            mqttClient.subscribe(mqttBockfotznTopic);
+            mqttClient.subscribe(mqttGetAggressiveTopic);
+            mqttClient.subscribe(mqttMoveStepperTopic);
+            mqttClient.subscribe(mqttMultiwatschnTopic);
+            return true;
+        } else {
+            Serial.print(F("Global MQTT connection failed. Error: "));
+            Serial.println(mqttClient.state());
+            return false;
+        }
     }
 
-  }
-
-  //++++++++++++++++++++++
-
-
-  // // if (mqttClient.connect(mqttClientId, mqttUser, mqttPass)) {
-  // //if (mqttClient.connect(mqttClientId, mqttUser, mqttPass, mqttWillTopic, mqttwillQoS, mqttwillRetain, mqttWillMessage)) {
-  // if (mqttClient.connect(mqttClientId)) {
-  //
-  //
-  //    // Once connected, publish an announcement...
-  //    //mqttClient.publish("outTopic","MyDevice is back!");
-  //    mqttClient.publish(mqttWillTopic, "Online", true);
-  //    mqttClient.publish(mqttfirmwareTopic, GHOTA_CURRENT_TAG, true);
-  //    // ... and resubscribe
-  //    mqttClient.subscribe(mqttupdateTopic);
-  //  }
-
-  return mqttClient.connected();
-
+    // Return true if already connected
+    return true;
 }
+
+boolean reconnect_local() {
+    setupLocalMQTT();
+
+    // Attempt to reconnect local MQTT client
+    if (!mqttClientLocal.connected()) {
+        Serial.print(F("Local MQTT: Attempting to reconnect using client name '"));
+        Serial.print(mqttClientId);
+        Serial.print(F("' as user '"));
+        Serial.print(mqttUserLocal);
+        Serial.print(F("' with password '"));
+        Serial.print(mqttPassLocal);
+        Serial.print(F("' to server "));
+        Serial.print(mqttServerLocal);
+        Serial.print(F(" at Port "));
+        Serial.println(mqttPortLocal);
+
+        if (mqttClientLocal.connect(mqttClientId, mqttUserLocal, mqttPassLocal)) {
+            Serial.println(F("(Local MQTT) Reconnected."));
+            mqttClientLocal.publish(mqttDevicenameTopic, mqttClientId);
+            mqttClientLocal.publish(mqttonlineTopicLocal, "online"); // Will be set up with will message
+//            publish_device_info(); // Adapt if necessary for local MQTT
+
+//interims-topics - use commented ones below later. also at another place in code!!  (around line 963)
+            mqttClientLocal.subscribe(mqttupdateTopic);
+            mqttClientLocal.subscribe(mqttBockfotznTopicLocal);
+            mqttClientLocal.subscribe(mqttGetAggressiveTopicLocal);
+            mqttClientLocal.subscribe(mqttMoveStepperTopicLocal);
+            mqttClientLocal.subscribe(mqttMultiwatschnTopicLocal);
+
+//            mqttClient.subscribe(mqttupdateTopic);
+//            mqttClient.subscribe(mqttBockfotznTopic);
+//            mqttClient.subscribe(mqttGetAggressiveTopic);
+//            mqttClient.subscribe(mqttMoveStepperTopic);
+//            mqttClient.subscribe(mqttMultiwatschnTopic);
+            return true;
+        } else {
+            Serial.print(F("Local MQTT connection failed. Error: "));
+            Serial.println(mqttClientLocal.state());
+            return false;
+        }
+    }
+
+    // Return true if already connected
+    return true;
+}
+
+
+//boolean reconnect() {
+//  // Setup MQTT configurations
+//  setup_mqtt_config();
+//  #ifdef USE_LOCAL_MQTT
+//  reconnect_local();
+//  #endif
+//  #ifdef USE_GLOBAL_MQTT
+//  reconnect_global();
+//  #endif
+//  
+////  #ifdef USE_LOCAL_MQTT
+////   #ifdef USE_GLOBAL_MQTT
+////       // Return true if both clients are connected
+////      return mqttClient.connected() && mqttClientLocal.connected();
+////    #endif
+////  #endif
+////
+////  #ifdef USE_LOCAL_MQTT
+////    return mqttClientLocal.connected()
+////  #endif
+////
+////  #ifdef USE_GLOBAL_MQTT
+////    return mqttClient.connected()
+////  #endif
+//bool checkMQTTConnections() {
+//    #ifdef USE_LOCAL_MQTT
+//        #ifdef USE_GLOBAL_MQTT
+//            // Both USE_LOCAL_MQTT and USE_GLOBAL_MQTT are defined
+//            return mqttClient.connected() && mqttClientLocal.connected();
+//        #else
+//            // Only USE_LOCAL_MQTT is defined
+//            return mqttClientLocal.connected();
+//        #endif
+//    #else
+//        #ifdef USE_GLOBAL_MQTT
+//            // Only USE_GLOBAL_MQTT is defined
+//            return mqttClient.connected();
+//        #else
+//            // Neither USE_LOCAL_MQTT nor USE_GLOBAL_MQTT is defined
+//            return false;
+//        #endif
+//    #endif
+//}
+//}
+
+bool checkMQTTConnections() {
+    #ifdef USE_LOCAL_MQTT
+        #ifdef USE_GLOBAL_MQTT
+            return mqttClient.connected() && mqttClientLocal.connected();
+        #else
+            return mqttClientLocal.connected();
+        #endif
+    #else
+        #ifdef USE_GLOBAL_MQTT
+            return mqttClient.connected();
+        #else
+            return false;
+        #endif
+    #endif
+}
+
+boolean reconnect() {
+  // Setup MQTT configurations
+  setup_mqtt_config();
+  
+  #ifdef USE_LOCAL_MQTT
+  reconnect_local();
+  #endif
+  
+  #ifdef USE_GLOBAL_MQTT
+  reconnect_global();
+  #endif
+
+  // Check MQTT connections
+  return checkMQTTConnections();
+}
+
 
 void publishToMQTT(String message, char* topic) {
   // Publish the user-defined message to the specified topic
@@ -1468,10 +1772,18 @@ void publish_device_info() {
   message += mqttClientId;
   message += ") running firmware ";
   message += GHOTA_CURRENT_TAG;
+  #ifdef USE_GLOBAL_MQTT
   mqttClient.publish(mqttDevicenameTopic, message.c_str());
-  Serial.print(F("Device info published to '"));
+  Serial.print(F("Device info published to global MQTT server in topic '"));
   Serial.print(mqttDevicenameTopic);
   Serial.println(F("'."));
+  #endif
+  #ifdef USE_LOCAL_MQTT
+  mqttClientLocal.publish(mqttDevicenameTopic, message.c_str());
+  Serial.print(F("Device info published to local MQTT server in topic '"));
+  Serial.print(mqttDevicenameTopic);
+  Serial.println(F("'."));
+  #endif
 }
 
 
@@ -1479,11 +1791,11 @@ void publish_device_info() {
 
 
 void setup() {
-  setup_GitHUB_OTA_upgrade();
     Wire.begin(); // initialize I2C interface
     Serial.begin(115200);
     Serial.println();
     Serial.println();
+    setup_GitHUB_OTA_upgrade();
     pinMode(LED_BLUE, OUTPUT); // initialize onboard LED as output
     pinMode(LIMIT_SWITCH_PIN, INPUT_PULLUP);
     free_stepper();
@@ -1512,7 +1824,7 @@ void setup() {
     
     display.drawString(display.getWidth() / 2, 31, "trying to connect\nto known WiFi");
     display.display();
-
+    setup_mqtt_config();
 
     //----------------------
     
@@ -1537,65 +1849,50 @@ void setup() {
 //  new (&calibrate_limitswitch) WiFiManagerParameter("customfieldid", "Limitswitch kalibrieren", "Custom Field Value", customFieldLength,"placeholder=\"Custom Field Placeholder\" type=\"checkbox\""); // custom html type
 
 //corrected:
-// Create the WiFiManagerParameter for rotation speed calibration
-//new (&calibrate_rotationspeed) WiFiManagerParameter(
-//    "calibrate_rot_speed",   // Unique ID with only alphanumeric characters
-//    "max_rot_speed kalibrieren", // Display label
-//    "Custom Field Value",    // Default value
-//    customFieldLength,
-//    "placeholder=\"Custom Field Placeholder\" type=\"checkbox\""
-//);
-//
+
+
 //// Create the WiFiManagerParameter for limit switch calibration
+//new (&calibrate_rotationspeed) WiFiManagerParameter(
+//    "calibrate_rot_speed", // Unique ID with only alphanumeric characters
+//    "max. Rotationsgeschwindigkeit kalibrieren", // Display label
+//    "0",                      // Default value (0 for unchecked, 1 for checked)
+//    10,                       // Field length (not strictly needed for checkboxes)
+////    "type=\"checkbox\""       // HTML attribute to render as a checkbox
+//    "type=\"checkbox\" style=\"display: block; margin-bottom: 15px;\""
+//);
+
+// Create the WiFiManagerParameter for limit switch calibration
+// Create the WiFiManagerParameter for limit switch calibration
 //new (&calibrate_limitswitch) WiFiManagerParameter(
 //    "calibrate_limit_switch", // Unique ID with only alphanumeric characters
 //    "Limitswitch kalibrieren", // Display label
-//    "Custom Field Value",     // Default value
-//    customFieldLength,
-//    "placeholder=\"Custom Field Placeholder\" type=\"checkbox\""
+//    "0",                      // Default value (0 for unchecked, 1 for checked)
+//    10,                       // Field length (not strictly needed for checkboxes)
+////    "type=\"checkbox\""       // HTML attribute to render as a checkbox
+//    "type=\"checkbox\" style=\"display: block; margin-bottom: 15px;\""
 //);
 
-//new (&calibrate_rotationspeed) WiFiManagerParameter(
-//    "calibrate_rot_speed",   // Unique ID with only alphanumeric characters
-//    "max_rot_speed kalibrieren", // Display label
-//    "Custom Field Value",    // Default value
-//    10,
-//    "placeholder=\"Custom Field Placeholder\" type=\"checkbox\""
+//new (&forbid_global_watsch_alliance) WiFiManagerParameter(
+//    "global_watsch_allianz", // Unique ID with only alphanumeric characters
+//    "globale Watschn-Allianz deaktivieren", // Display label
+//    "0",                      // Default value (0 for unchecked, 1 for checked)
+//    10,                       // Field length (not strictly needed for checkboxes)
+////    "type=\"checkbox\""       // HTML attribute to render as a checkbox
+//    "type=\"checkbox\" style=\"display: block; margin-bottom: 15px;\""
 //);
 
-// Create the WiFiManagerParameter for limit switch calibration
-new (&calibrate_rotationspeed) WiFiManagerParameter(
-    "calibrate_rot_speed", // Unique ID with only alphanumeric characters
-    "max. Rotationsgeschwindigkeit kalibrieren", // Display label
-    "0",                      // Default value (0 for unchecked, 1 for checked)
-    10,                       // Field length (not strictly needed for checkboxes)
-//    "type=\"checkbox\""       // HTML attribute to render as a checkbox
-    "type=\"checkbox\" style=\"display: block; margin-bottom: 15px;\""
-);
+//new (&forbid_mesh_remote) WiFiManagerParameter(
+//    "allow_mesh_remote", // Unique ID with only alphanumeric characters
+//    "Mesh-Fernbedienung verbieten", // Display label
+//    "0",                      // Default value (0 for unchecked, 1 for checked)
+//    10,                       // Field length (not strictly needed for checkboxes)
+////    "type=\"checkbox\""       // HTML attribute to render as a checkbox
+//    "type=\"checkbox\" style=\"display: block; margin-bottom: 15px;\""
+//);
 
-// Create the WiFiManagerParameter for limit switch calibration
-// Create the WiFiManagerParameter for limit switch calibration
-new (&calibrate_limitswitch) WiFiManagerParameter(
-    "calibrate_limit_switch", // Unique ID with only alphanumeric characters
-    "Limitswitch kalibrieren", // Display label
-    "0",                      // Default value (0 for unchecked, 1 for checked)
-    10,                       // Field length (not strictly needed for checkboxes)
-//    "type=\"checkbox\""       // HTML attribute to render as a checkbox
-    "type=\"checkbox\" style=\"display: block; margin-bottom: 15px;\""
-);
-
-new (&forbid_global_watsch_alliance) WiFiManagerParameter(
-    "global_watsch_allianz", // Unique ID with only alphanumeric characters
-    "globale Watschn-Allianz deaktivieren", // Display label
-    "0",                      // Default value (0 for unchecked, 1 for checked)
-    10,                       // Field length (not strictly needed for checkboxes)
-//    "type=\"checkbox\""       // HTML attribute to render as a checkbox
-    "type=\"checkbox\" style=\"display: block; margin-bottom: 15px;\""
-);
-
-new (&forbid_mesh_remote) WiFiManagerParameter(
-    "allow_mesh_remote", // Unique ID with only alphanumeric characters
-    "Mesh-Fernbedienung verbieten", // Display label
+new (&sofort_loswatschen) WiFiManagerParameter(
+    "sofortloswatschen", // Unique ID with only alphanumeric characters
+    "sofort nach Speichern loswatschen", // Display label
     "0",                      // Default value (0 for unchecked, 1 for checked)
     10,                       // Field length (not strictly needed for checkboxes)
 //    "type=\"checkbox\""       // HTML attribute to render as a checkbox
@@ -1604,18 +1901,66 @@ new (&forbid_mesh_remote) WiFiManagerParameter(
 
 
 
-// MQTT parameters
+//// MQTT parameters
+//new (&custom_mqtt_server) WiFiManagerParameter(
+//    "mqtt_server",                // Unique ID
+//    "MQTT Server für globale Watschn-Allianz",                // Display label
+//    "broker.hivemq.com",          // Default value
+//    40                            // Length of the input field
+//);
+
+
+// local MQTT parameters
+new (&custom_mqtt_server_local) WiFiManagerParameter(
+    "mqtt_server_local",               // Unique ID
+    "lokaler MQTT Server", // Display label
+    mqttServerLocal,                  // Default value from the mqttServer variable
+    60                           // Length of the input field
+);
+
+new (&custom_mqtt_user_local) WiFiManagerParameter(
+    "mqtt_user_name_local",              // Unique ID
+    "local MQTT username",              // Display label
+    mqttUserLocal,                           // Default value (empty for no default password)
+    40                            // Length of the input field
+);
+
+new (&custom_mqtt_password_local) WiFiManagerParameter(
+    "mqtt_password_local",              // Unique ID
+    "lokales MQTT Password",              // Display label
+    mqttPassLocal,                           // Default value (empty for no default password)
+    40,                            // Length of the input field
+    "type=\"password\""           // HTML attribute to hide password input
+);
+
+// Define custom MQTT server port parameter
+new (&custom_mqtt_port_local) WiFiManagerParameter(
+    "mqtt_port_local",                 // Unique ID
+    "lokaler MQTT Port",                 // Display label
+    mqttPortLocal_txt,                      // Default value (standard MQTT port)
+    5                            // Length of the input field (5 is enough for "1883")
+);
+
+
+// global MQTT parameters Watschnallianz:
 new (&custom_mqtt_server) WiFiManagerParameter(
-    "mqtt_server",                // Unique ID
-    "MQTT Server für globale Watschn-Allianz",                // Display label
-    "broker.hivemq.com",          // Default value
+    "mqtt_server",               // Unique ID
+    "MQTT Server für globale Watschn-Allianz", // Display label
+    mqttServer,                  // Default value from the mqttServer variable
+    60                           // Length of the input field
+);
+
+new (&custom_mqtt_user) WiFiManagerParameter(
+    "mqtt_user_name",              // Unique ID
+    "MQTT user für globale Watschn-Allianz",              // Display label
+    mqttUser,                           // Default value (empty for no default password)
     40                            // Length of the input field
 );
 
 new (&custom_mqtt_password) WiFiManagerParameter(
     "mqtt_password",              // Unique ID
     "MQTT Password für globale Watschn-Allianz",              // Display label
-    "",                           // Default value (empty for no default password)
+    mqttPass,                           // Default value (empty for no default password)
     40,                            // Length of the input field
     "type=\"password\""           // HTML attribute to hide password input
 );
@@ -1624,7 +1969,7 @@ new (&custom_mqtt_password) WiFiManagerParameter(
 new (&custom_mqtt_port) WiFiManagerParameter(
     "mqtt_port",                 // Unique ID
     "MQTT Port für globale Watschn-Allianz",                 // Display label
-    "1883",                      // Default value (standard MQTT port)
+    mqttPort_txt,                      // Default value (standard MQTT port)
     5                            // Length of the input field (5 is enough for "1883")
 );
 
@@ -1632,13 +1977,19 @@ new (&custom_mqtt_port) WiFiManagerParameter(
 //  const char* custom_radio_str = "<br/><label for='customfieldid'>Custom Field Label</label><input type='radio' name='customfieldid' value='1' checked> One<br><input type='radio' name='customfieldid' value='2'> Two<br><input type='radio' name='customfieldid' value='3'> Three<br>";
 //  new (&custom_field) WiFiManagerParameter(custom_radio_str); // custom html input
 //  
+  wm.addParameter(&custom_mqtt_server_local);
+  wm.addParameter(&custom_mqtt_user_local);
+  wm.addParameter(&custom_mqtt_password_local);
+  wm.addParameter(&custom_mqtt_port_local); 
   wm.addParameter(&forbid_global_watsch_alliance);
   wm.addParameter(&custom_mqtt_server);
+  wm.addParameter(&custom_mqtt_user);
   wm.addParameter(&custom_mqtt_password);
   wm.addParameter(&custom_mqtt_port); 
   wm.addParameter(&calibrate_rotationspeed);
   wm.addParameter(&calibrate_limitswitch);
   wm.addParameter(&forbid_mesh_remote);
+  wm.addParameter(&sofort_loswatschen);
   
 
 //------------------------------------------------------------------------
@@ -1654,14 +2005,30 @@ new (&custom_mqtt_port) WiFiManagerParameter(
 //------------------------------------------------------------------------
     //------------------
 
+        // Get the ESP8266 Chip ID
+          uint32_t chipID = ESP.getChipId();
+        
+          // Create a String to hold the portal name
+          String portalName = "WatschnFM (ChipID " + String(chipID) + ")";
+        
+          // Convert String to char array for startConfigPortal
+          char portalNameChar[portalName.length() + 1];
+          portalName.toCharArray(portalNameChar, portalName.length() + 1);
+
+          
     //automatically connect using saved credentials if they exist
     //If connection fails it starts an access point with the specified name
     //if(wm.autoConnect("WatschnFM")){
-    if (wm.autoConnect("WatschnFM", "")) {
+    
+    
+    
+    //if (wm.autoConnect("WatschnFM", "")) {
+    if (wm.autoConnect(portalNameChar, "")) {
+      
         // Print the SSID of the connected WiFi network to Serial Monitor
         Serial.print(F("Connected to WiFi Network: "));
         Serial.println(WiFi.SSID());  // Print the SSID of the currently connected WiFi network
-    
+        Serial.print(F("...using static wifi settings from known_wifis.txt or manually set wifi using WifiManager. Double-reset/double-power-OFF to reset wifi settings from WifManager."));
         // Display status and SSID on OLED
         display.clear();
         display.setFont(ArialMT_Plain_10);  // Set a smaller font for better fit
@@ -1688,14 +2055,20 @@ new (&custom_mqtt_port) WiFiManagerParameter(
     }
     else {
         wm.setTimeout(0);  // Disable timeout, AP stays up indefinitely
-        wm.startConfigPortal("WatschnFM","");
+        
+//        wm.startConfigPortal("WatschnFM","");
+
+       // Start the WiFiManager configuration portal with the dynamic name
+          wm.startConfigPortal(portalNameChar, "");
+
+  
         Serial.println(F("Configportal running"));
         display.clear();
         display.setFont(ArialMT_Plain_10);
         display.drawString(display.getWidth() / 2,8, "! CONFIG NEEDED !");
         display.drawString(display.getWidth() / 2,20, "Access point opened.");
         display.drawString(display.getWidth() / 2,32, "Please connect to");
-        display.drawString(display.getWidth() / 2,44, "WiFi ' WatschnFM '");
+        display.drawString(display.getWidth() / 2,44, "WiFi 'WatschnFM (x)'");
         display.drawString(display.getWidth() / 2,56, "to configure WiFi.");
         display.display();
         configportal=true;
@@ -1775,10 +2148,10 @@ new (&custom_mqtt_port) WiFiManagerParameter(
   Serial.print(F("IP address: "));
   Serial.println(WiFi.localIP());
 
-        Serial.print(F("WiFiManager-Checkbox 'Günter kalibrieren': "));
-        Serial.println(calibrate_rotationspeed.getValue());
-        Serial.print(F("WiFiManager-Checkbox 'Limitswitch kalibrieren': "));
-        Serial.println(calibrate_limitswitch.getValue());
+//        Serial.print(F("WiFiManager-Checkbox 'Günter kalibrieren': "));
+//        Serial.println(calibrate_rotationspeed.getValue());
+//        Serial.print(F("WiFiManager-Checkbox 'Limitswitch kalibrieren': "));
+//        Serial.println(calibrate_limitswitch.getValue());
 
 
 timeClient.begin();
@@ -1862,27 +2235,27 @@ void printElapsedTime(const char* label) {
 }
 
 
-void setup_ESPMesh(){
-    //functions for mesh remote:
-  Serial.println(F("setting up ESP mesh..."));
-    meshManager.setup();
-    
-    // Define callback functions
-    auto watschnFunction = []() {
-        Serial.println(F("Watschn function called via mesh remote!"));
-        // Add your code for watschn here
-    };
-    
-    auto schellnFunction = []() {
-        Serial.println(F("Schelln function called via mesh remote!"));
-        // Add your code for schelln here
-    };
-    
-    // Set callback functions
-    meshManager.setWatschnCallback(watschnFunction);
-    meshManager.setSchellnCallback(schellnFunction);
-    Serial.println(F(" done!"));
-}
+//void setup_ESPMesh(){
+//    //functions for mesh remote:
+//  Serial.println(F("setting up ESP mesh..."));
+//    meshManager.setup();
+//    
+//    // Define callback functions
+//    auto watschnFunction = []() {
+//        Serial.println(F("Watschn function called via mesh remote!"));
+//        // Add your code for watschn here
+//    };
+//    
+//    auto schellnFunction = []() {
+//        Serial.println(F("Schelln function called via mesh remote!"));
+//        // Add your code for schelln here
+//    };
+//    
+//    // Set callback functions
+//    meshManager.setWatschnCallback(watschnFunction);
+//    meshManager.setSchellnCallback(schellnFunction);
+//    Serial.println(F(" done!"));
+//}
 
 // Define a function to move the stepper motor forward or backward by given steps
 void move_stepper(int steps) {
@@ -2628,7 +3001,7 @@ void calm_down(){
 void i2cscan(){
   byte error, address;
   int nDevices;
-  Serial.println(F("Scanning..."));
+  Serial.println(F("Scanning for I2C devices..."));
   nDevices = 0;
   for(address = 1; address < 127; address++ )
   {
@@ -2648,6 +3021,7 @@ void i2cscan(){
      }
      else if (error==4)
      {
+      Serial.println(F("If you get a lot of devices next to the following error, there might be an error in hardware wiring for I2C..."));
       Serial.print(F("Unknown error at address 0x"));
       if (address<16){
          Serial.print(F("0"));
@@ -2920,53 +3294,8 @@ void show_time_to_oled(){
     }
 }
 
-void loop() {
-//  printElapsedTime("re-entering loop");
-//  // Reset checkpoint at the start of the loop
-//    checkpointTime = micros();
-//    looptime_calculation(); //for debugging if loop takes too long
-//    printElapsedTime("before meshmanager");
-
-
-//ESP mesh:
-//meshManager.loop();
-
-    wm.process();
-
-//    checkpointTime = micros();
-//    looptime_calculation(); //for debugging if loop takes too long
-//    printElapsedTime("after wm.process");
-
-    ArduinoOTA.handle();
-    
-  //  handle_blue_LED();
- 
-    //check_for_wifimanager_request(); //ATTENTION: function is currently triggered by limit switch - only use for debugging, if you dont find another trigger for it.
-    listen_to_serial();
-
-    
-    show_time_to_oled();
-
-    goto_init_position_idle2();
-
-    get_aggressive_when_provocated(3);
-
-    ausfallschritt_servo.detach();
-
-
-//    nowtime=millis();
-//    if(nowtime-starttime>3000){
-//    multiwatschn2(3,30);
-//    starttime=millis();
-//    }
-
-    //schwungholen_und_watschen();    //delay(5000);
-    //multiwatschn3(5);
-    //delay(1000);
-    
-    
-
-//ACHTUNG: das ist ohne Zeitoffset!! passt also noch nicht:
+void check_for_clock_triggered_actions(){
+      //ACHTUNG: das ist noch ohne Zeitoffset sommer/winter!! passt also noch nicht:
     if (timeClient.getHours() == 12 && timeClient.getMinutes() == 0 && timeClient.getSeconds() == 0) {
       auf_die_12();
     }
@@ -2974,113 +3303,195 @@ void loop() {
     if (timeClient.getHours() == 13 && timeClient.getMinutes() == 0 && timeClient.getSeconds() == 0) {
       jetzt_schlägts_13();
     }
-    if (timeClient.getHours() == 00 && timeClient.getMinutes() == 55 && timeClient.getSeconds() == 0) {
-      Serial.println("################ test 00:43h . #####################");
-      Serial.println("################ test 00:43h . #####################");
-      Serial.println("################ test 00:43h . #####################");
-      Serial.println("################ test 00:43h . #####################");
-    }
+//    if (timeClient.getHours() == 00 && timeClient.getMinutes() == 55 && timeClient.getSeconds() == 0) {
+//      Serial.println(F("################ test 00:43h . #####################"));
+//    }
+}
 
-//checkpointTime = micros();
-//    looptime_calculation(); //for debugging if loop takes too long
-//    printElapsedTime("Time after time client");
+void loop() {
+    //meshManager.loop(); //ESP mesh
+    wm.process(); // Keep the config portal alive
+    //handle_blue_LED();  //commented because servo uses same pin as LED - only uncomment it for debug purposes
+    //check_for_wifimanager_request(); //ATTENTION: function is currently triggered by limit switch - only use for debugging, if you dont find another trigger for it.
+    listen_to_serial();
+    show_time_to_oled();
+    goto_init_position_idle2();
+    get_aggressive_when_provocated(3);
+    ausfallschritt_servo.detach();
+    
+
 
 
 //functions for GitHub OTA-update:
-  wifiManager.process();
+  //wifiManager.process();
   drd.loop(); //double reset detector
   //  OFF FOR DEBUG
-  if (WiFi.status() == WL_CONNECTED) { //if connected to wifi
-    ArduinoOTA.handle();
-    if (!mqttClient.connected()) {
-      if (!mqtt_config_hasbeenread) { //if we have not yet read mqtt config, try to read it from config file
-        setup_mqtt_config();
-      }
-      nowtime = millis();
-      if (nowtime - lastReconnectAttempt > 5000) {
-        lastReconnectAttempt = millis();
-        // Attempt to reconnect
-        //Serial.println(F("DEBUG: reconnecting MQTT, retrying every 5 seconds"));
-        if (reconnect()) {
-          lastReconnectAttempt = 0;
+//  if (WiFi.status() == WL_CONNECTED) { //if connected to wifi
+//    ArduinoOTA.handle();
+//    check_for_clock_triggered_actions();
+//
+//    //to do: decide between local and global here
+//    if (!mqttClient.connected()) {
+//      if (!mqtt_config_hasbeenread) { //if we have not yet read mqtt config, try to read it from config file
+//        setup_mqtt_config();
+//      }
+//      nowtime = millis();
+//      if (nowtime - lastReconnectAttempt > 5000) {
+//        lastReconnectAttempt = millis();
+//        // Attempt to reconnect
+//        //Serial.println(F("DEBUG: reconnecting MQTT, retrying every 5 seconds"));
+//        if (reconnect()) {
+//          lastReconnectAttempt = 0;
+//        }
+//      }
+//    } else {
+//      // Client connected
+//      mqttClient.loop();
+//      //Serial.println(F("DEBUG: looping MQTT"));
+//    }
+//  }
+    if (WiFi.status() == WL_CONNECTED) { // If connected to WiFi
+      ArduinoOTA.handle(); // Handle OTA updates
+      check_for_clock_triggered_actions(); // Perform any scheduled actions
+  
+      // Handle MQTT connections
+      #ifdef USE_LOCAL_MQTT
+      if (!mqttClientLocal.connected()) { // If local MQTT client is not connected
+        if (!mqtt_config_hasbeenread) { // If MQTT config hasn't been read
+          setup_mqtt_config(); // Read MQTT configuration
         }
+        unsigned long nowtime = millis(); // Get the current time
+        if (nowtime - lastReconnectAttempt > 5000) { // Check if 5 seconds have passed
+          lastReconnectAttempt = nowtime; // Update the last reconnect attempt time
+          if (reconnect_local()) { // Attempt to reconnect to local MQTT
+            lastReconnectAttempt = 0; // Reset the reconnect attempt timer if successful
+          }
+        }
+      } else { // Local MQTT client is connected
+        mqttClientLocal.loop(); // Process incoming messages for local MQTT client
+        //Serial.println(F("DEBUG:looping mqttClient for local MQTT"));
       }
+      #endif
+  
+      #ifdef USE_GLOBAL_MQTT
+      if (!mqttClient.connected()) { // If global MQTT client is not connected
+        if (!mqtt_config_hasbeenread) { // If MQTT config hasn't been read
+          setup_mqtt_config(); // Read MQTT configuration
+        }
+        unsigned long nowtime = millis(); // Get the current time
+        if (nowtime - lastReconnectAttempt > 5000) { // Check if 5 seconds have passed
+          lastReconnectAttempt = nowtime; // Update the last reconnect attempt time
+          if (reconnect_global()) { // Attempt to reconnect to global MQTT
+            lastReconnectAttempt = 0; // Reset the reconnect attempt timer if successful
+          }
+        }
+      } else { // Global MQTT client is connected
+        mqttClient.loop(); // Process incoming messages for global MQTT client
+        //Serial.println(F("DEBUG:looping mqttClient for global MQTT"));
+      }
+      #endif
     } else {
-      // Client connected
-      mqttClient.loop();
-      //Serial.println(F("DEBUG: looping MQTT"));
+      // Optionally handle WiFi disconnection here if needed
     }
-  }
+
 }
 
 
-void saveParamsCallback () {
-  Serial.println(F("Get Params:"));
+void saveParamsCallback() {
+    Serial.println(F("Get Parameters from WiFiManager configuration:"));
 
-  // Print MQTT server parameter
-  Serial.print(F("MQTT Server der globalen Watschn-Allianz: "));
-  Serial.println(custom_mqtt_server.getValue());
+    // Retrieve new values from WiFiManager
+    const char* tempMqttServerLocal = custom_mqtt_server_local.getValue();
+    const char* tempMqttUserLocal = custom_mqtt_user_local.getValue();
+    const char* tempMqttPassLocal = custom_mqtt_password_local.getValue();
+    const char* tempMqttPortLocal = custom_mqtt_port_local.getValue();
 
-  // Print MQTT password parameter
-  Serial.print(F("MQTT Password (globale Watschn-Allianz): "));
-  Serial.println(custom_mqtt_password.getValue());
+    // Update the global variables
+    mqttServerLocal = strdup(tempMqttServerLocal);
+    mqttUserLocal = strdup(tempMqttUserLocal);
+    mqttPassLocal = strdup(tempMqttPassLocal);
+    mqttPortLocal_txt = strdup(tempMqttPortLocal);
 
-  // Print MQTT port parameter
-  Serial.print(F("MQTT Port (globale Watschn-Allianz): "));
-  Serial.println(custom_mqtt_port.getValue());
+    // Print values
+    Serial.print(F("MQTT Server lokal: "));
+    Serial.println(mqttServerLocal);
+    Serial.print(F("MQTT user lokal: "));
+    Serial.println(mqttUserLocal);
+    Serial.print(F("MQTT passwort lokal: "));
+    Serial.println(mqttPassLocal);
+    Serial.print(F("MQTT port lokal: "));
+    Serial.println(mqttPortLocal_txt);
 
-  // Print calibration rotation speed parameter
-  Serial.print(F("Checkbox Calibrate Rotation Speed : "));
-  String rotSpeedValue = calibrate_rotationspeed.getValue();
-  //Serial.println(rotSpeedValue);  // Print raw value
- if (rotSpeedValue == "0") {
-    Serial.println(F("Checked"));
-  } else {
-    Serial.println(F("Unchecked"));
-  }
+    // Convert mqttPortLocal_txt to integer
+    mqttPortLocal = atoi(mqttPortLocal_txt);
 
-  // Print limit switch calibration parameter
-  Serial.print(F("Checkbox Calibrate Limit Switch : "));
-  String limitSwitchValue = calibrate_limitswitch.getValue();
+          // Print mesh remote parameter
+  Serial.print(F("Checkbox sofort loswatschen: "));
+  String str_loswatschen = sofort_loswatschen.getValue();
   //Serial.println(limitSwitchValue);  // Print raw value
-if (limitSwitchValue == "0") {
+if (str_loswatschen == "0") {
     Serial.println(F("Checked"));
+    Serial.println(F("Watsche jetzt drauf los"));
+    schwungholen_und_watschen(0);
   } else {
     Serial.println(F("Unchecked"));
   }
 
-    // Print global watsch alliance parameter
-  Serial.print(F("Checkbox verbiete Globale Watschn-Allianz: "));
-  String watsch_alliance = forbid_global_watsch_alliance.getValue();
-  //Serial.println(limitSwitchValue);  // Print raw value
-if (watsch_alliance == "0") {
-    Serial.println(F("Checked"));
-    verbiete_globale_watschn_allianz=true;
-  } else {
-    Serial.println(F("Unchecked"));
-    verbiete_globale_watschn_allianz=false;
-  }
+    // Save updated configuration to file
+    writeConfigFile();
+}
 
-      // Print mesh remote parameter
-  Serial.print(F("Checkbox verbiete mesh-Fernbedienung: "));
-  String mesh_remote = forbid_mesh_remote.getValue();
-  //Serial.println(limitSwitchValue);  // Print raw value
-if (mesh_remote == "0") {
-    Serial.println(F("Checked"));
-    verbiete_mesh_remote=true;
-  } else {
-    Serial.println(F("Unchecked"));
-    verbiete_mesh_remote=false;
-  }
+void writeConfigFile() {
+    Serial.println(F("trying to write new config from WiFiManager to mqtt_config.txt in SPIFFS..."));
+
+    // Prepare the updated values in a map
+    std::map<String, String> configMap;
+    configMap["mqttClientId"] = mqttClientId;
+    configMap["mqttDevicenameTopic"] = mqttDevicenameTopic;
+    configMap["mqttupdateTopic"] = mqttupdateTopic;
+    configMap["mqttBockfotznTopic"] = mqttBockfotznTopic;
+    configMap["mqttGetAggressiveTopic"] = mqttGetAggressiveTopic;
+    configMap["mqttMoveStepperTopic"] = mqttMoveStepperTopic;
+    configMap["mqttMultiwatschnTopic"] = mqttMultiwatschnTopic;
+    configMap["mqttonlineTopic"] = mqttonlineTopic;
+    configMap["mqttfirmwareTopic"] = mqttfirmwareTopic;
+    configMap["mqttWillTopic"] = mqttWillTopic;
+    configMap["mqttServerLocal"] = mqttServerLocal;
+    configMap["mqttPortLocal_txt"] = mqttPortLocal_txt;
+    configMap["mqttUserLocal"] = mqttUserLocal;
+    configMap["mqttPassLocal"] = mqttPassLocal;
+    configMap["mqttServer"] = mqttServer;
+    configMap["mqttPort_txt"] = mqttPort_txt;
+    configMap["mqttUser"] = mqttUser;
+    configMap["mqttPass"] = mqttPass;
+    configMap["mqttBockfotznTopic"] = mqttBockfotznTopic;
+    configMap["mqttGetAggressiveTopic"] = mqttGetAggressiveTopic;
+    configMap["mqttMoveStepperTopic"] = mqttMoveStepperTopic;
+    configMap["mqttMultiwatschnTopic"] = mqttMultiwatschnTopic;
+
+    // Open the config file for writing
+    File configFile = SPIFFS.open("/mqtt_config.txt", "w");
+    if (!configFile) {
+        Serial.println(F("Failed to open config file for writing"));
+        return;
+    }
+
+    // Write the updated values to the file
+    for (const auto& pair : configMap) {
+        Serial.println("Writing: " + pair.first + "=" + pair.second); // Debug output
+        configFile.println(pair.first + "=" + pair.second);
+    }
+    configFile.flush();
+    configFile.close();
+
+    Serial.println(F("Configuration saved."));
 }
 
 
 
 
-// Call this function to send a mesh message on demand
-void sendMessageToMesh(const String &message) {
-    meshManager.sendMeshMessage(message);
-}
-// Example of sending a message
-   // meshManager.sendMeshMessage("watschn"); // Send a test message
-   // meshManager.sendMeshMessage("schelln"); // Send a test message
+
+//// Call this function to send a mesh message on demand
+//void sendMessageToMesh(const String &message) {
+//    meshManager.sendMeshMessage(message);
+//}
